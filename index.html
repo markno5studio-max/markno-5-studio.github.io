@@ -1,0 +1,2645 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>馬克伍號影像工作室 | MARK NO.5 VIDEO STUDIO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@200;300;400;500;700;900&family=Bebas+Neue&family=Iansui&family=Google+Sans+Flex&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --gold:#C9963A;--gold-lt:#E4B86A;--gold-dk:#9A6E20;
+  --red:#B52020;--line:#06C755;
+  --bg:#09090B;--bg2:#0F0F12;--bg3:#161618;--bg4:#1E1E22;
+  --t1:#F0EBE2;--t2:#C8C2B6;--t3:#9A948C;
+  --border:rgba(255,255,255,0.07);--border-g:rgba(201,150,58,0.25);--glow:rgba(201,150,58,0.35);
+  --serif:'Noto Serif TC',Georgia,serif;--display:'Bebas Neue',sans-serif;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+  --hero-en-font:'Google Sans Flex','Noto Serif TC',sans-serif;
+  --hero-en-size:clamp(3rem,8vw,7.5rem);
+  --hero-zh-size:clamp(1.5rem,3vw,2.6rem);
+  --scroll-size:1rem;--scroll-color:rgba(255,255,255,0.55);--scroll-font:'Bebas Neue',sans-serif;
+  --label-size:0.92rem;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--serif);font-weight:300;line-height:1.8;overflow-x:hidden;padding-bottom:76px}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--gold-dk)}
+::selection{background:var(--gold);color:var(--bg)}
+
+/* SweetAlert2 */
+.swal2-popup{background:var(--bg3)!important;color:var(--t1)!important;border:1px solid var(--border-g)!important;font-family:var(--serif)!important}
+.swal2-title{color:var(--gold)!important;font-weight:400!important}
+.swal2-html-container{color:var(--t2)!important}
+.swal2-input,.swal2-textarea,.swal2-select{background:var(--bg2)!important;color:var(--t1)!important;border-color:var(--border-g)!important}
+.swal2-confirm{background:var(--gold)!important;color:var(--bg)!important;font-weight:700!important}
+.swal2-cancel{background:var(--bg4)!important;color:var(--t2)!important}
+
+/* Intro overlay */
+#intro-overlay{position:fixed;inset:0;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#intro-canvas{position:absolute;inset:0;width:100%;height:100%}
+#intro-logo-el{position:absolute;width:200px;height:200px;border-radius:50%;object-fit:cover;border:2px solid transparent;opacity:0;transform:scale(1.06);z-index:3;filter:blur(6px)}
+#intro-tagline{position:absolute;bottom:26%;font-family:var(--display);font-size:clamp(.75rem,1.5vw,1rem);letter-spacing:.45em;color:var(--gold);opacity:0;z-index:3}
+
+/* Share bar */
+#share-bar{position:fixed;top:0;left:0;right:0;height:30px;background:rgba(9,9,11,.97);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;padding:0 6%;gap:12px;z-index:1002}
+.share-btn{display:inline-flex;align-items:center;gap:5px;color:var(--t2);text-decoration:none;background:none;border:none;cursor:pointer;font-family:var(--display);font-size:.68rem;letter-spacing:.08em;padding:2px 6px;transition:color .2s}
+.share-btn:hover{color:var(--gold)}
+@media(max-width:600px){.share-label{display:none}}
+
+/* Header */
+header{position:fixed;top:30px;left:0;width:100%;z-index:1000;padding:0 6%;height:70px;display:flex;align-items:center;justify-content:space-between;transition:transform .45s var(--ease),background .3s;background:transparent}
+header.scrolled{background:rgba(9,9,11,.94);backdrop-filter:blur(24px);box-shadow:0 1px 0 var(--border)}
+header.hide{transform:translateY(-100%)}
+.logo-link{display:flex;align-items:center;gap:12px;text-decoration:none}
+.logo-img{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1.5px solid var(--gold);box-shadow:0 0 10px var(--glow);transition:box-shadow .3s}
+.logo-link:hover .logo-img{box-shadow:0 0 22px var(--glow)}
+.brand-name{font-family:var(--serif);font-weight:500;font-size:.88rem;color:var(--gold);letter-spacing:.06em;display:inline-block}
+nav ul{display:flex;list-style:none;gap:32px;align-items:center}
+nav a{color:var(--t2);text-decoration:none;font-family:var(--serif);font-weight:300;font-size:.85rem;letter-spacing:.04em;transition:color .25s;position:relative;line-height:1}
+nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--gold);transition:width .3s}
+nav a:hover{color:var(--gold)}nav a:hover::after{width:100%}
+.nav-line-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;background:transparent;border:1.5px solid var(--line);border-radius:30px;color:var(--line);text-decoration:none;font-family:var(--serif);font-size:.82rem;transition:all .25s;white-space:nowrap;line-height:1.4}
+.nav-line-btn:hover{background:var(--line);color:#fff;box-shadow:0 0 16px rgba(6,199,85,.4)}
+.nav-line-btn::after{display:none!important}
+.menu-toggle{display:none;background:none;border:none;color:var(--gold);font-size:1.3rem;cursor:pointer}
+
+/* Mobile nav */
+.mobile-nav{position:fixed;inset:0;background:rgba(9,9,11,.98);backdrop-filter:blur(20px);z-index:998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;transform:translateX(100%);transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+.mobile-nav.open{transform:translateX(0)}
+.mobile-nav a{font-family:var(--display);font-size:2.5rem;letter-spacing:.05em;color:var(--t2);text-decoration:none;transition:color .2s}
+.mobile-nav a:hover{color:var(--gold)}
+.mobile-nav-close{position:absolute;top:24px;right:6%;background:none;border:none;color:var(--t2);font-size:1.5rem;cursor:pointer}
+
+/* Hero */
+#hero{position:relative;width:100%;height:100vh;min-height:600px;overflow:hidden;background:var(--bg)}
+.carousel-track{position:absolute;inset:0}
+.carousel-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2.2s ease;pointer-events:none}
+.carousel-slide.active{opacity:1}
+.carousel-slide.active.pan-r{animation:panR 9s ease-in-out forwards}
+.carousel-slide.active.pan-l{animation:panL 9s ease-in-out forwards}
+@keyframes panR{from{transform:scale(1.08) translateX(-1%)}to{transform:scale(1.14) translateX(1%)}}
+@keyframes panL{from{transform:scale(1.08) translateX(1%)}to{transform:scale(1.14) translateX(-1%)}}
+#hero::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(9,9,11,.55) 0%,rgba(9,9,11,.08) 40%,rgba(9,9,11,.08) 60%,rgba(9,9,11,.72) 100%);z-index:2;pointer-events:none}
+.carousel-dots{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:5}
+.carousel-dot{width:28px;height:2px;background:rgba(255,255,255,.25);border:none;cursor:pointer;transition:background .3s,width .3s;padding:0}
+.carousel-dot.active{background:var(--gold);width:48px}
+.hero-overlay{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 6%;pointer-events:none}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:14px;font-family:var(--display);font-size:.85rem;letter-spacing:.35em;color:var(--gold);margin-bottom:28px;opacity:0;animation:fadeUp 1s var(--ease) forwards .5s}
+.hero-eyebrow::before,.hero-eyebrow::after{content:'';width:40px;height:1px;background:var(--gold);opacity:.5}
+#hero-en-title{font-family:var(--hero-en-font);font-size:var(--hero-en-size);font-weight:900;letter-spacing:.06em;color:rgba(255,255,255,.95);line-height:.95;display:block;margin-bottom:14px;opacity:0;animation:fadeUp 1s var(--ease) forwards .8s;text-shadow:0 2px 40px rgba(0,0,0,.6)}
+#hero-zh-title{font-family:var(--serif);font-size:var(--hero-zh-size);font-weight:300;letter-spacing:.05em;color:var(--gold-lt);font-style:italic;display:block;line-height:1.35;opacity:0;animation:fadeUp 1s var(--ease) forwards 1s}
+.hero-sub{font-size:clamp(.9rem,1.4vw,1.05rem);color:rgba(255,255,255,.65);font-weight:300;margin:20px 0 44px;max-width:600px;line-height:1.8;opacity:0;animation:fadeUp 1s var(--ease) forwards 1.2s}
+.hero-cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;pointer-events:all;opacity:0;animation:fadeUp 1s var(--ease) forwards 1.4s}
+.scroll-cue{position:absolute;bottom:76px;left:50%;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;opacity:0;animation:fadeIn 1s forwards 2.5s}
+#scroll-label{font-family:var(--scroll-font);font-size:var(--scroll-size);letter-spacing:.3em;color:var(--scroll-color)}
+.scroll-line{width:1px;height:48px;background:linear-gradient(to bottom,var(--gold),transparent);animation:scrollPulse 2s ease-in-out infinite 3s}
+@keyframes scrollPulse{0%,100%{transform:scaleY(1);opacity:.8}50%{transform:scaleY(.6);opacity:.3}}
+
+/* Buttons */
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:13px 34px;background:var(--gold);color:var(--bg);font-family:var(--serif);font-weight:500;font-size:.88rem;letter-spacing:.08em;text-decoration:none;border:none;cursor:pointer;transition:all .3s var(--ease)}
+.btn-primary:hover{background:var(--gold-lt);transform:translateY(-2px);box-shadow:0 10px 32px var(--glow)}
+.btn-outline{display:inline-flex;align-items:center;gap:8px;padding:12px 34px;background:transparent;color:rgba(255,255,255,.8);font-family:var(--serif);font-weight:300;font-size:.88rem;letter-spacing:.08em;text-decoration:none;border:1px solid rgba(255,255,255,.3);cursor:pointer;transition:all .3s var(--ease)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,150,58,.06)}
+
+/* Sections */
+.section{padding:120px 6%}
+.section-alt{background:var(--bg2)}
+.section-label{display:inline-flex;align-items:center;gap:12px;font-family:var(--display);font-size:var(--label-size);letter-spacing:.22em;color:var(--gold);margin-bottom:20px}
+.section-label::before{content:'';width:32px;height:1px;background:var(--gold);opacity:.5}
+.section-heading{font-family:var(--serif);font-size:clamp(1.9rem,3.6vw,2.9rem);font-weight:300;letter-spacing:.04em;line-height:1.25;margin-bottom:14px}
+.section-sub{color:var(--t2);font-size:1rem;font-weight:300;max-width:500px;line-height:1.9}
+
+/* About */
+.about-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;margin-top:64px;background:var(--border)}
+.about-card{background:var(--bg);padding:52px 40px;position:relative;overflow:hidden;transition:background .35s}
+.about-card::after{content:'';position:absolute;top:0;left:0;right:0;height:0;background:var(--gold);transition:height .4s}
+.about-card:hover{background:var(--bg2)}
+.about-card:hover::after{height:2px}
+.about-card-num{font-family:var(--display);font-size:4.5rem;color:var(--border);line-height:1;margin-bottom:28px;transition:color .35s}
+.about-card:hover .about-card-num{color:rgba(201,150,58,.12)}
+.about-card h3{font-family:var(--serif);font-size:1.1rem;font-weight:400;letter-spacing:.04em;margin-bottom:16px;color:var(--t1)}
+.about-card p{font-size:.96rem;color:var(--t2);line-height:1.9;font-weight:300}
+.about-rich{font-size:.93rem;color:var(--t2);line-height:1.85;font-weight:300}
+.about-rich ul{list-style:none;padding:0;margin-top:10px}
+.about-rich li::before{content:'▸ ';color:var(--gold);margin-right:6px;font-size:.8rem}
+.about-card .divider{width:30px;height:1px;background:var(--gold);opacity:.4;margin:24px 0}
+.about-card .sub-item{margin-bottom:18px}
+.about-card .sub-item h4{font-size:.72rem;font-family:var(--display);letter-spacing:.18em;color:var(--gold);margin-bottom:6px}
+
+/* Services */
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-top:64px}
+.service-card{background:var(--bg2);padding:44px 36px;display:flex;gap:26px;align-items:flex-start;transition:background .35s;position:relative;overflow:hidden}
+.service-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(to right,rgba(201,150,58,.06),transparent);transition:width .4s}
+.service-card:hover{background:var(--bg3)}
+.service-card:hover::before{width:100%}
+.svc-icon{width:48px;height:48px;border:1px solid var(--border-g);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:1.15rem;flex-shrink:0;transition:all .3s}
+.service-card:hover .svc-icon{border-color:var(--gold);box-shadow:0 0 18px var(--glow)}
+.svc-body h3{font-family:var(--serif);font-size:1.02rem;font-weight:400;letter-spacing:.04em;margin-bottom:10px;color:var(--t1)}
+.svc-body p{font-size:.93rem;color:var(--t2);font-weight:300;line-height:1.82}
+
+/* Process */
+.process-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-top:64px}
+.process-step{background:var(--bg);padding:34px 26px;transition:background .3s}
+.process-step:hover{background:var(--bg3)}
+.proc-num{font-family:var(--display);font-size:3rem;line-height:1;color:var(--border);margin-bottom:16px;transition:color .3s}
+.process-step:hover .proc-num{color:var(--gold)}
+.proc-icon{font-size:.9rem;color:var(--gold);margin-bottom:8px}
+.proc-title{font-family:var(--serif);font-size:.98rem;font-weight:500;letter-spacing:.04em;margin-bottom:4px}
+.proc-en{font-family:var(--display);font-size:.66rem;letter-spacing:.18em;color:var(--t3);display:block;margin-bottom:13px;padding-bottom:13px;border-bottom:1px solid var(--border)}
+.proc-desc{font-size:.92rem;color:var(--t2);line-height:1.75;font-weight:300}
+
+/* Portfolio */
+.portfolio-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:40px 0 32px}
+.pf-filters{display:flex;gap:8px;flex-wrap:wrap}
+.filter-btn{padding:6px 20px;background:transparent;border:1px solid var(--border);color:var(--t2);font-family:var(--serif);font-size:.82rem;cursor:pointer;transition:all .25s}
+.filter-btn:hover{border-color:var(--gold);color:var(--gold)}
+.filter-btn.active{background:var(--gold);border-color:var(--gold);color:var(--bg);font-weight:600}
+.pf-search{padding:9px 18px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-family:var(--serif);font-size:.84rem;outline:none;transition:border-color .25s;width:210px}
+.pf-search:focus{border-color:var(--gold)}
+.pf-search::placeholder{color:var(--t2);opacity:.8}
+.portfolio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:2px;background:var(--border)}
+.pf-item{background:var(--bg2);display:block;position:relative;overflow:hidden;transition:transform .35s}
+.pf-item:not(.playing):hover{transform:scale(1.01);z-index:2}
+.pf-thumb-wrap{position:relative;padding-bottom:56.25%;overflow:hidden;background:var(--bg3);cursor:pointer}
+.pf-thumb{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .7s ease,opacity .5s}
+.pf-item:not(.playing):hover .pf-thumb{transform:scale(1.06)}
+.pf-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;transition:all .3s}
+.pf-item:not(.playing):hover .pf-overlay{background:rgba(0,0,0,.18)}
+.pf-play-icon{font-size:3.4rem;color:rgba(255,255,255,.85);transition:all .3s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
+.pf-item:not(.playing):hover .pf-play-icon{color:var(--gold);filter:drop-shadow(0 0 20px var(--glow));transform:scale(1.1)}
+.pf-badge{position:absolute;top:14px;left:14px;padding:3px 12px;background:rgba(9,9,11,.78);border:1px solid rgba(255,255,255,.12);font-size:.72rem;color:var(--t2);font-family:var(--display);letter-spacing:.1em;backdrop-filter:blur(8px);pointer-events:none;z-index:2}
+.pf-item.playing .pf-thumb,.pf-item.playing .pf-overlay{opacity:0;pointer-events:none}
+.pf-yt-iframe{position:absolute;inset:0;width:100%;height:100%;border:none;z-index:5}
+.pf-preview-iframe{position:absolute;inset:0;width:100%;height:100%;border:none;opacity:0;pointer-events:none;transition:opacity .3s;z-index:4}
+.pf-item.hovering .pf-preview-iframe{opacity:1}
+.pf-item.hovering .pf-thumb{opacity:0}
+.pf-close-btn{position:absolute;top:8px;right:8px;width:32px;height:32px;background:rgba(0,0,0,.85);border:1px solid rgba(255,255,255,.25);border-radius:50%;color:#fff;font-size:.85rem;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:6}
+.pf-item.playing .pf-close-btn{display:flex}
+.pf-admin-btns{position:absolute;top:10px;right:10px;display:none;gap:6px;z-index:10}
+.pf-admin-btns.show{display:flex}
+.pf-admin-btn{width:30px;height:30px;border-radius:50%;background:rgba(9,9,11,.85);border:1px solid var(--border-g);color:var(--gold);font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.pf-admin-btn:hover{background:var(--gold);color:var(--bg)}
+.pf-admin-btn.del{border-color:rgba(181,32,32,.4);color:var(--red)}
+.pf-admin-btn.del:hover{background:var(--red);color:#fff}
+.pf-info{padding:20px 24px 24px;border-top:1px solid var(--border)}
+.pf-info h3{font-size:1rem;font-weight:400;margin-bottom:6px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-info p{font-size:.88rem;color:var(--t3);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.65}
+.pf-empty{grid-column:1/-1;text-align:center;padding:80px 0;color:var(--t3)}
+
+/* Contact */
+.contact-wrap{display:grid;grid-template-columns:5fr 7fr;gap:1px;background:var(--border);margin-top:64px}
+.contact-info-box,.contact-form-box{background:var(--bg2);padding:56px 44px}
+.contact-info-box h3,.contact-form-box h3{font-family:var(--serif);font-size:1.2rem;font-weight:400;letter-spacing:.04em;margin-bottom:24px}
+.contact-info-box>p{font-size:.96rem;color:var(--t2);font-weight:300;line-height:1.9;margin-bottom:36px}
+.cinfo-row{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.cinfo-icon{width:38px;height:38px;border:1px solid var(--border-g);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:.85rem;flex-shrink:0}
+.cinfo-text{font-size:.92rem;color:var(--t2)}
+.cinfo-text a{color:var(--t2);text-decoration:none;transition:color .2s}
+.cinfo-text a:hover{color:var(--gold)}
+.social-row{display:flex;gap:12px;margin-top:30px}
+.social-btn{width:42px;height:42px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--t2);text-decoration:none;font-size:1rem;transition:all .25s}
+.social-btn:hover{border-color:var(--gold);color:var(--gold)}
+.social-edit-area{display:none;margin-top:14px;padding:12px;border:1px dashed var(--border-g);font-size:.78rem;color:var(--t3)}
+.social-edit-area.show{display:block}
+.form-row{margin-bottom:20px}
+.form-lbl{display:block;font-family:var(--display);font-size:.72rem;letter-spacing:.2em;color:var(--t2);margin-bottom:8px;text-transform:uppercase}
+.form-ctrl{width:100%;padding:12px 16px;background:var(--bg);border:1px solid var(--border);color:var(--t1);font-family:var(--serif);font-size:.9rem;font-weight:300;outline:none;transition:border-color .25s}
+.form-ctrl:focus{border-color:var(--gold)}
+.form-ctrl::placeholder{color:var(--t2);opacity:.82}
+textarea.form-ctrl{height:110px;resize:vertical}
+.form-checks-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 14px;margin-top:10px}
+.form-check-item{display:flex;align-items:center;gap:7px;font-size:.9rem;color:var(--t2);cursor:pointer;user-select:none;padding:4px 0}
+.form-check-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:pointer;flex-shrink:0}
+.form-note{font-size:.9rem;color:var(--t2);margin-top:14px;line-height:1.65;font-weight:300;font-style:italic}
+
+/* Footer */
+footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 32px}
+.footer-top{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr;gap:44px;margin-bottom:44px}
+.footer-brand-col .logo-wrap{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.footer-logo{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--border-g)}
+.footer-brand-name{font-family:var(--serif);font-weight:500;font-size:.9rem;color:var(--gold)}
+.footer-tagline{font-size:.88rem;color:var(--t2);font-weight:300;line-height:1.9;margin-bottom:18px;white-space:pre-line}
+.footer-social{display:flex;gap:10px}
+.fsocial-btn{width:34px;height:34px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--t3);text-decoration:none;font-size:.85rem;transition:all .25s}
+.fsocial-btn:hover{border-color:var(--gold);color:var(--gold)}
+.footer-col h4{font-family:var(--display);font-size:.72rem;letter-spacing:.2em;color:var(--gold);margin-bottom:18px;text-transform:uppercase}
+.footer-col ul{list-style:none}
+.footer-col ul li{margin-bottom:10px}
+.footer-col ul li a{font-size:.85rem;color:var(--t3);text-decoration:none;font-weight:300;transition:color .2s}
+.footer-col ul li a:hover{color:var(--t1)}
+.foot-contact p{font-size:.84rem;color:var(--t3);margin-bottom:10px;font-weight:300}
+.foot-contact a{color:var(--t3);text-decoration:none;transition:color .2s}
+.foot-contact a:hover{color:var(--gold)}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.footer-copy,.footer-meta{font-size:.78rem;color:var(--t3);font-weight:300}
+
+/* Admin bar */
+#admin-bar{position:fixed;bottom:0;left:0;right:0;min-height:76px;background:rgba(9,9,11,.97);backdrop-filter:blur(20px);border-top:1px solid var(--border-g);padding:10px 6%;display:flex;align-items:center;justify-content:space-between;z-index:9998;transform:translateY(calc(100% - 3px));transition:transform .4s cubic-bezier(.34,1.56,.64,1);flex-wrap:wrap;gap:8px}
+#admin-bar::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60px;height:3px;background:var(--gold);border-radius:3px 3px 0 0;opacity:.6}
+#admin-bar.show{transform:translateY(calc(100% - 3px))}
+#admin-bar:hover,#admin-bar.hover{transform:translateY(0)!important}
+.admin-info{font-size:.82rem;color:var(--t2);font-weight:300;flex-shrink:0}
+.admin-info strong{color:var(--gold)}
+.admin-ctrls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.admin-btn{padding:7px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--t2);font-family:var(--serif);font-size:.74rem;cursor:pointer;transition:all .25s;display:none;white-space:nowrap}
+.admin-btn.show{display:inline-flex;align-items:center;gap:4px}
+.admin-btn:hover{border-color:var(--gold);color:var(--gold)}
+.admin-btn.save{background:var(--gold);color:var(--bg);border-color:var(--gold);font-weight:700}
+.admin-btn.logout:hover{border-color:var(--red);color:var(--red)}
+#float-login-btn{position:fixed;bottom:24px;right:24px;z-index:9997;padding:9px 22px;background:var(--bg3);border:1px solid var(--border-g);color:var(--gold);font-family:var(--serif);font-size:.78rem;cursor:pointer;transition:all .25s;display:none}
+#float-login-btn:hover{box-shadow:0 0 16px var(--glow)}
+[contenteditable="true"]{outline:1px dashed rgba(201,150,58,.4);outline-offset:2px;cursor:text;border-radius:2px}
+[contenteditable="true"]:focus{outline:2px solid var(--gold)!important;background:rgba(201,150,58,.04)!important}
+#label-editor{display:none}
+#label-editor.show{display:block;padding:16px 6%;background:var(--bg2);border-top:1px solid var(--border);font-size:.78rem;color:var(--t3)}
+
+/* Analytics */
+.anl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.anl-stat{background:var(--bg2);border:1px solid var(--border-g);padding:16px;text-align:center}
+.anl-stat-num{font-family:var(--display);font-size:2.2rem;color:var(--gold);line-height:1}
+.anl-stat-lbl{font-size:.72rem;color:var(--t2);margin-top:4px;letter-spacing:.08em}
+.anl-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.anl-bar-label{font-size:.76rem;color:var(--t2);width:85px;flex-shrink:0;text-align:right}
+.anl-bar-track{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.anl-bar-fill{height:100%;background:linear-gradient(to right,var(--gold-dk),var(--gold));border-radius:3px;transition:width .8s var(--ease)}
+.anl-bar-val{font-size:.74rem;color:var(--t2);width:36px;text-align:right;flex-shrink:0}
+
+/* RIPPLE — uses transform to center from click point */
+.mk5-ripple{
+  position:fixed;
+  border-radius:50%;
+  pointer-events:none;
+  z-index:99990;
+  width:0;height:0;
+  transform:translate(-50%,-50%);
+  animation:mk5Ripple .7s ease-out forwards;
+}
+@keyframes mk5Ripple{
+  0%  {width:0;height:0;border:3px solid rgba(201,150,58,.9);opacity:1}
+  60% {border:2px solid rgba(201,150,58,.5);opacity:.6}
+  100%{width:86px;height:86px;border:1.5px solid rgba(201,150,58,0);opacity:0}
+}
+
+/* Scroll reveal */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+.stagger>*{opacity:0;transform:translateY(18px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.stagger.in>*:nth-child(1){opacity:1;transform:none;transition-delay:0s}
+.stagger.in>*:nth-child(2){opacity:1;transform:none;transition-delay:.09s}
+.stagger.in>*:nth-child(3){opacity:1;transform:none;transition-delay:.18s}
+.stagger.in>*:nth-child(4){opacity:1;transform:none;transition-delay:.27s}
+.stagger.in>*:nth-child(5){opacity:1;transform:none;transition-delay:.36s}
+.stagger.in>*:nth-child(6){opacity:1;transform:none;transition-delay:.45s}
+.stagger.in>*:nth-child(7){opacity:1;transform:none;transition-delay:.54s}
+.stagger.in>*:nth-child(8){opacity:1;transform:none;transition-delay:.63s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{to{opacity:1}}
+@keyframes brandShake{0%{transform:translateX(0)}15%{transform:translateX(-4px) rotate(-1.5deg)}30%{transform:translateX(4px) rotate(1.5deg)}45%{transform:translateX(-3px)}60%{transform:translateX(2px)}75%{transform:translateX(-1px)}100%{transform:translateX(0)}}
+
+/* Responsive */
+@media(max-width:1100px){.services-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1024px){.process-grid{grid-template-columns:repeat(2,1fr)}.about-grid{grid-template-columns:1fr}.footer-top{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){.section{padding:80px 5%}nav{display:none}.menu-toggle{display:block}.services-grid{grid-template-columns:1fr}.process-grid{grid-template-columns:1fr}.portfolio-grid{grid-template-columns:1fr}.contact-wrap{grid-template-columns:1fr}.footer-top{grid-template-columns:1fr}.footer-bottom{flex-direction:column;text-align:center}.portfolio-controls{flex-direction:column;align-items:flex-start}}
+@media(max-width:480px){.hero-cta{flex-direction:column;align-items:center}.btn-primary,.btn-outline{width:100%;justify-content:center}}
+
+/* ── FIRST SLIDE FADE-IN (was jumping) ── */
+.carousel-slide:first-child.active{animation:firstSlideFadeIn 1.2s ease forwards,panR 9s ease-in-out forwards}
+@keyframes firstSlideFadeIn{0%{opacity:0}100%{opacity:1}}
+
+/* ── PORTFOLIO: 4 cols + pagination ── */
+.portfolio-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--border)}
+@media(max-width:1200px){.portfolio-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:800px){.portfolio-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.portfolio-grid{grid-template-columns:1fr}}
+.pf-pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:50px;padding:24px 0;background:linear-gradient(to bottom,rgba(201,150,58,0.05),rgba(201,150,58,0.08));border-radius:8px;border:1px solid rgba(201,150,58,0.15);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.pf-page-btn{width:40px;height:40px;background:var(--bg3);border:2px solid var(--border-g);color:var(--t1);cursor:pointer;font-family:var(--display);font-size:.9rem;transition:all .3s;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:600}
+.pf-page-btn:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-2px);box-shadow:0 4px 12px rgba(201,150,58,0.2)}
+.pf-page-btn.active{background:var(--gold);border-color:var(--gold);color:var(--bg);font-weight:700;box-shadow:0 4px 16px rgba(201,150,58,0.4)}
+.pf-page-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+
+/* ── WEATHER WIDGET ── */
+#weather-bar{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:.78rem;letter-spacing:.08em;color:var(--t2);margin-right:16px}
+#weather-bar i{font-size:1rem}
+#clock-time{font-family:var(--display);font-size:.72rem;letter-spacing:.08em;color:var(--t3)}
+#clock-weather-widget{transition:all .3s}
+@media(max-width:900px){
+  #clock-weather-widget{position:static!important;transform:none!important;justify-content:center;margin-bottom:20px;font-size:.85rem}
+}
+@media(max-width:600px){
+  #clock-weather-widget{font-size:.78rem}
+  #clock-weather-widget #weather-icon{font-size:1.1rem}
+}
+
+/* ── PROCESS NUMBER dim/hover ── */
+.proc-num{font-family:var(--display);font-size:3rem;line-height:1;color:rgba(255,255,255,.18);margin-bottom:16px;transition:color .4s,text-shadow .4s}
+.process-step:hover .proc-num{color:var(--gold);text-shadow:0 0 20px var(--glow)}
+
+/* ── RIPPLE (settable via CSS vars) ── */
+:root{--ripple-color:rgba(201,150,58,0.85);--ripple-size:86px;--ripple-width:3px}
+.mk5-ripple{position:fixed;border-radius:50%;pointer-events:none;z-index:99990;width:0;height:0;transform:translate(-50%,-50%);animation:mk5Ripple .7s ease-out forwards}
+@keyframes mk5Ripple{
+  0%  {width:0;height:0;border-width:var(--ripple-width);border-style:solid;border-color:var(--ripple-color);opacity:1}
+  60% {opacity:.6}
+  100%{width:var(--ripple-size);height:var(--ripple-size);border-width:1.5px;border-style:solid;border-color:transparent;opacity:0}
+}
+
+/* ── INBOX TABLE ── */
+.inbox-row{padding:12px 0;border-bottom:1px solid var(--border);text-align:left}
+.inbox-name{color:var(--gold);font-size:.9rem;font-weight:600}
+.inbox-date{color:var(--t3);font-size:.72rem}
+.inbox-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.68rem;margin-left:6px}
+.inbox-badge.new{background:rgba(201,150,58,.2);color:var(--gold);border:1px solid var(--border-g)}
+.inbox-badge.replied{background:rgba(6,199,85,.15);color:#06C755;border:1px solid rgba(6,199,85,.3)}
+.reply-btn{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:var(--gold);color:var(--bg);text-decoration:none;font-size:.75rem;font-weight:700;cursor:pointer;border:none;transition:all .2s}
+.reply-btn:hover{background:var(--gold-lt)}
+
+/* ── USER AVATAR ── */
+.user-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--border-g)}
+.user-avatar.online{border-color:#06C755;box-shadow:0 0 0 3px rgba(6,199,85,.3),0 0 12px rgba(6,199,85,.4)}
+
+/* ── USER MANAGEMENT CARD ── */
+.user-card{display:flex;align-items:center;gap:14px;padding:14px;background:var(--bg2);border:1px solid var(--border);margin-bottom:12px;border-radius:6px;transition:all .3s}
+.user-card:hover{border-color:var(--border-g);transform:translateX(3px)}
+.user-avatar-wrap{position:relative;flex-shrink:0}
+.user-avatar-large{width:70px;height:70px;border-radius:50%;object-fit:cover;border:3px solid var(--border);transition:all .3s}
+.user-avatar-large.online{border-color:#06C755;box-shadow:0 0 0 4px rgba(6,199,85,.2),0 0 20px rgba(6,199,85,.6),0 0 40px rgba(6,199,85,.3)}
+.upload-avatar-btn{position:absolute;bottom:-5px;right:-5px;width:26px;height:26px;border-radius:50%;background:var(--gold);border:2px solid var(--bg2);color:var(--bg);cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.upload-avatar-btn:hover{background:var(--gold-lt);transform:scale(1.1)}
+.user-info{flex:1}
+.user-name{font-size:.95rem;color:var(--t1);font-weight:400;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.user-role-badge{display:inline-block;padding:3px 10px;border-radius:12px;color:#fff;font-size:.68rem;font-family:var(--display);letter-spacing:.06em;font-weight:600}
+.user-role-badge.super_admin{background:linear-gradient(135deg,#C9963A,#E4B86A)}
+.user-role-badge.ops_admin{background:linear-gradient(135deg,#4A90E2,#67B5F5)}
+.user-role-badge.editor{background:linear-gradient(135deg,#9A948C,#B8B2A8)}
+.user-online-status{color:#06C755;font-size:.68rem;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.user-meta{font-size:.72rem;color:var(--t3)}
+.user-actions{display:flex;gap:8px;flex-wrap:wrap}
+.user-action-btn{padding:6px 14px;border:1px solid var(--border);background:var(--bg3);color:var(--t2);cursor:pointer;font-size:.75rem;transition:all .2s;border-radius:3px}
+.user-action-btn:hover{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+.user-action-btn.delete{border-color:rgba(181,32,32,.4);color:var(--red)}
+.user-action-btn.delete:hover{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* Video Modal */
+.video-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:10000;align-items:center;justify-content:center}
+.video-modal.active{display:flex}
+.video-modal-content{position:relative;width:90vw;max-width:1400px;aspect-ratio:16/9;background:var(--bg);border-radius:8px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.video-modal-close{position:absolute;top:-50px;right:0;background:transparent;border:none;color:#fff;font-size:2rem;cursor:pointer;width:50px;height:50px;display:flex;align-items:center;justify-content:center;transition:transform .2s}
+.video-modal-close:hover{transform:scale(1.2)}
+#video-modal-player{width:100%;height:100%}
+#video-modal-player iframe{width:100%;height:100%;border:none}
+@media(max-width:768px){
+.video-modal-content{width:95vw;border-radius:4px}
+.video-modal-close{top:-45px;font-size:1.5rem;width:45px;height:45px}
+}
+</style>
+</head>
+<body>
+
+<div id="intro-overlay">
+  <canvas id="intro-canvas"></canvas>
+  <img id="intro-logo-el" src="" alt="">
+  <div id="intro-tagline">MARK NO.5 VIDEO STUDIO</div>
+</div>
+
+<div id="share-bar">
+  <div id="weather-bar">
+    <span id="clock-display">載入中...</span>
+    <span id="weather-icon" style="margin-left:8px">☀️</span>
+  </div>
+  <span style="font-family:var(--display);font-size:.65rem;letter-spacing:.1em;color:var(--t3)">SHARE</span>
+  <button class="share-btn" onclick="shareNative()"><i class="fa-solid fa-share-nodes"></i><span class="share-label"> 分享</span></button>
+  <a class="share-btn" id="share-line" href="#" target="_blank" rel="noopener"><i class="fab fa-line"></i><span class="share-label"> LINE</span></a>
+  <a class="share-btn" id="share-fb" href="#" target="_blank" rel="noopener"><i class="fab fa-facebook-f"></i><span class="share-label"> FB</span></a>
+  <a class="share-btn" id="share-ig" href="https://www.instagram.com/" target="_blank" rel="noopener"><i class="fab fa-instagram"></i><span class="share-label"> IG</span></a>
+  <button class="share-btn" onclick="copyLink()"><i class="fa-regular fa-copy"></i><span class="share-label"> 複製</span></button>
+</div>
+
+<div class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-close" onclick="closeMobileNav()"><i class="fa-solid fa-xmark"></i></button>
+  <a href="#about" onclick="closeMobileNav()">關於我們</a>
+  <a href="#services" onclick="closeMobileNav()">專業服務</a>
+  <a href="#process" onclick="closeMobileNav()">服務流程</a>
+  <a href="#portfolio" onclick="closeMobileNav()">精選作品</a>
+  <a href="#contact" onclick="closeMobileNav()">聯絡我們</a>
+  <a id="mobile-line-btn" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;border:2px solid #06C755;border-radius:40px;padding:10px 28px;color:#06C755;font-size:1.2rem"><i class="fab fa-line"></i>LINE 諮詢</a>
+</div>
+
+<header id="site-header">
+  <a href="#hero" class="logo-link">
+    <img id="site-logo" src="" alt="Logo" class="logo-img">
+    <span class="brand-name" id="header-brand" data-key="brandName"></span>
+  </a>
+  <nav>
+    <ul>
+      <li><a href="#about">關於我們</a></li>
+      <li><a href="#services">專業服務</a></li>
+      <li><a href="#process">服務流程</a></li>
+      <li><a href="#portfolio">精選作品</a></li>
+      <li><a href="#contact">聯絡我們</a></li>
+      <li><a id="nav-line-btn" href="#" target="_blank" rel="noopener" class="nav-line-btn"><i class="fab fa-line"></i>LINE 線上諮詢</a></li>
+    </ul>
+  </nav>
+  <button class="menu-toggle" onclick="openMobileNav()"><i class="fa-solid fa-bars"></i></button>
+</header>
+
+<section id="hero">
+  <div class="carousel-track" id="carousel-track"></div>
+  <div class="hero-overlay">
+    <div class="hero-eyebrow" data-key="heroSubtitle"></div>
+    <h1 style="text-align:center;line-height:1.1">
+      <span id="hero-en-title" data-key="heroEnTitle"></span>
+      <span id="hero-zh-title" data-key="heroZhTitle"></span>
+    </h1>
+    <p class="hero-sub" data-key="heroDesc"></p>
+    <div class="hero-cta">
+      <a href="#portfolio" class="btn-primary"><i class="fa-solid fa-play fa-xs"></i>瀏覽作品</a>
+      <a href="#contact" class="btn-outline" id="hero-contact-btn">立即合作 →</a>
+    </div>
+  </div>
+  <div class="carousel-dots" id="carousel-dots"></div>
+  <div class="scroll-cue"><span id="scroll-label">SCROLL</span><div class="scroll-line"></div></div>
+</section>
+
+<section id="about" class="section">
+  <div class="section-label reveal" data-key="label01"></div>
+  <h2 class="section-heading reveal" data-key="aboutHeading"></h2>
+  <p class="section-sub reveal" data-key="aboutDesc"></p>
+  <div class="about-grid stagger">
+    <div class="about-card"><div class="about-card-num">01</div><h3 data-key="aboutTitle" data-type="html"></h3><div class="about-rich" data-key="readyDesc" data-type="html"></div></div>
+    <div class="about-card"><div class="about-card-num">02</div><h3 data-key="readyTitle"></h3><p data-key="card1Desc"></p></div>
+    <div class="about-card"><div class="about-card-num">03</div><h3 data-key="missionTitle"></h3><div class="divider"></div><div class="sub-item"><h4 data-key="card1Title"></h4><p data-key="card1SubDesc"></p></div><div class="sub-item"><h4 data-key="card2Title"></h4><p data-key="card2Desc"></p></div></div>
+  </div>
+</section>
+
+<section id="services" class="section section-alt">
+  <div class="section-label reveal" data-key="label02"></div>
+  <h2 class="section-heading reveal" data-key="servicesHeading"></h2>
+  <p class="section-sub reveal" data-key="servicesSub"></p>
+  <div class="services-grid stagger">
+    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-camera"></i></div><div class="svc-body"><h3 data-key="svc1Title"></h3><p data-key="svc1Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-clapperboard"></i></div><div class="svc-body"><h3 data-key="svc2Title"></h3><p data-key="svc2Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-regular fa-building"></i></div><div class="svc-body"><h3 data-key="svc3Title"></h3><p data-key="svc3Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-regular fa-lightbulb"></i></div><div class="svc-body"><h3 data-key="svc4Title"></h3><p data-key="svc4Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-calendar-check"></i></div><div class="svc-body"><h3 data-key="svc5Title"></h3><p data-key="svc5Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-music"></i></div><div class="svc-body"><h3 data-key="svc6Title"></h3><p data-key="svc6Desc"></p></div></div>
+    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-mobile-screen-button"></i></div><div class="svc-body"><h3 data-key="svc7Title"></h3><p data-key="svc7Desc"></p></div></div>
+  </div>
+</section>
+
+<section id="process" class="section">
+  <div class="section-label reveal" data-key="label03"></div>
+  <h2 class="section-heading reveal" data-key="processHeading"></h2>
+  <p class="section-sub reveal" data-key="processSub"></p>
+  <div class="process-grid stagger">
+    <div class="process-step"><div class="proc-num">01</div><div class="proc-icon"><i class="fa-regular fa-comments"></i></div><div class="proc-title" data-key="procTitle1"></div><span class="proc-en">DISCUSSION</span><p class="proc-desc" data-key="procDesc1"></p></div>
+    <div class="process-step"><div class="proc-num">02</div><div class="proc-icon"><i class="fa-solid fa-file-signature"></i></div><div class="proc-title" data-key="procTitle2"></div><span class="proc-en">QUOTATION</span><p class="proc-desc" data-key="procDesc2"></p></div>
+    <div class="process-step"><div class="proc-num">03</div><div class="proc-icon"><i class="fa-solid fa-pen-nib"></i></div><div class="proc-title" data-key="procTitle3"></div><span class="proc-en">SCRIPT</span><p class="proc-desc" data-key="procDesc3"></p></div>
+    <div class="process-step"><div class="proc-num">04</div><div class="proc-icon"><i class="fa-solid fa-list-check"></i></div><div class="proc-title" data-key="procTitle4"></div><span class="proc-en">PRE-PRODUCTION</span><p class="proc-desc" data-key="procDesc4"></p></div>
+    <div class="process-step"><div class="proc-num">05</div><div class="proc-icon"><i class="fa-solid fa-video"></i></div><div class="proc-title" data-key="procTitle5"></div><span class="proc-en">FILMING</span><p class="proc-desc" data-key="procDesc5"></p></div>
+    <div class="process-step"><div class="proc-num">06</div><div class="proc-icon"><i class="fa-solid fa-laptop-file"></i></div><div class="proc-title" data-key="procTitle6"></div><span class="proc-en">POST-PRODUCTION</span><p class="proc-desc" data-key="procDesc6"></p></div>
+    <div class="process-step"><div class="proc-num">07</div><div class="proc-icon"><i class="fa-regular fa-circle-check"></i></div><div class="proc-title" data-key="procTitle7"></div><span class="proc-en">DELIVERY</span><p class="proc-desc" data-key="procDesc7"></p></div>
+    <div class="process-step"><div class="proc-num">08</div><div class="proc-icon"><i class="fa-solid fa-hand-holding-dollar"></i></div><div class="proc-title" data-key="procTitle8"></div><span class="proc-en">FINAL PAYMENT</span><p class="proc-desc" data-key="procDesc8"></p></div>
+  </div>
+</section>
+
+<section id="portfolio" class="section section-alt">
+  <div class="section-label reveal" data-key="label04"></div>
+  <h2 class="section-heading reveal" data-key="portfolioHeading"></h2>
+  <div class="portfolio-controls reveal">
+    <div class="pf-filters" id="pf-filters"></div>
+    <input type="text" id="pf-search" class="pf-search" placeholder="🔍 搜尋作品">
+  </div>
+  <div class="portfolio-grid" id="portfolio-list"></div>
+  <div class="pf-pagination" id="pf-pagination"></div>
+</section>
+
+<section id="contact" class="section">
+  <div class="section-label reveal" data-key="label05"></div>
+  <h2 class="section-heading reveal" data-key="contactTitle"></h2>
+  <p class="section-sub reveal" data-key="contactDesc"></p>
+  <div class="contact-wrap reveal">
+    <div class="contact-info-box">
+      <h3>聯絡資訊</h3>
+      <p>有任何合作想法或詢問，歡迎隨時聯繫。</p>
+      <div class="cinfo-row"><div class="cinfo-icon"><i class="fa-regular fa-envelope"></i></div><div class="cinfo-text"><a id="email-link" href="#"></a></div></div>
+      <div class="social-row" id="social-container"></div>
+      <div class="social-edit-area" id="social-edit"></div>
+    </div>
+    <div class="contact-form-box">
+      <h3>發送訊息</h3>
+      <form id="contact-form">
+        <div class="form-row"><label class="form-lbl">您的稱呼</label><input type="text" id="f-name" class="form-ctrl" placeholder="王小明" required></div>
+        <div class="form-row"><label class="form-lbl">電子信箱</label><input type="email" id="f-email" class="form-ctrl" placeholder="your@email.com" required></div>
+        <div class="form-row"><label class="form-lbl">聯絡電話</label><input type="tel" id="f-phone" class="form-ctrl" placeholder="0912-345-678"></div>
+        <div class="form-row">
+          <label class="form-lbl">可聯繫時間</label>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+            <label class="form-check-item"><input type="checkbox" name="time" value="上午 06-12"><span>☀ 上午 06–12</span></label>
+            <label class="form-check-item"><input type="checkbox" name="time" value="下午 12-18"><span>🌤 下午 12–18</span></label>
+            <label class="form-check-item"><input type="checkbox" name="time" value="晚間 18-22"><span>🌙 晚間 18–22</span></label>
+          </div>
+        </div>
+        <div class="form-row"><label class="form-lbl">專案需求 <span style="font-size:.75rem;color:var(--t3);text-transform:none;letter-spacing:0">（可複選）</span></label><div class="form-checks-wrap" id="form-checks"></div></div>
+        <div class="form-row"><label class="form-lbl">補充說明</label><textarea id="f-msg" class="form-ctrl" placeholder="請補充預算、時程或其他特殊需求..."></textarea></div>
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center"><i class="fa-regular fa-paper-plane fa-xs"></i> 發送訊息</button>
+        <p class="form-note" data-key="formNote"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<div id="label-editor"><strong style="color:var(--gold)">作品集欄位：</strong> <span data-key="pfLabelUrl"></span> · <span data-key="pfLabelTitle"></span> · <span data-key="pfLabelCat"></span> · <span data-key="pfLabelDesc"></span></div>
+
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand-col">
+      <div class="logo-wrap"><img id="footer-logo" src="" alt="" class="footer-logo"><span class="footer-brand-name" data-key="brandName"></span></div>
+      <p class="footer-tagline" data-key="footerTagline"></p>
+      <div class="footer-social" id="footer-social"></div>
+    </div>
+    <div class="footer-col"><h4>快速連結</h4><ul><li><a href="#about">關於我們</a></li><li><a href="#services">專業服務</a></li><li><a href="#process">服務流程</a></li><li><a href="#portfolio">精選作品</a></li></ul></div>
+    <div class="footer-col"><h4>服務項目</h4><ul><li><a href="#services">動態影像拍攝</a></li><li><a href="#services">商業廣告製作</a></li><li><a href="#services">企業形象影片</a></li><li><a href="#services">活動紀錄</a></li><li><a href="#services">音樂錄影帶</a></li><li><a href="#services">短影音製作</a></li></ul></div>
+    <div class="footer-col"><h4>聯絡資訊</h4><div class="foot-contact"><p><i class="fa-regular fa-envelope" style="color:var(--gold);margin-right:6px"></i><a id="footer-email" href="#"></a></p><p style="margin-top:14px;color:var(--t3);font-size:.8rem;font-style:italic;line-height:1.7">準備好了嗎？<br>讓我們一起創造<br>令人難忘的視覺作品。</p></div></div>
+  </div>
+  <div class="footer-bottom">
+    <div>
+      <div style="font-size:.84rem;color:var(--t2);margin-bottom:3px" data-key="footerCompany"></div>
+      <span class="footer-copy" id="footer-copy-el"></span>
+    </div>
+    <span class="footer-meta">Designed with ♥ · 馬克伍號影像工作室</span>
+  </div>
+</footer>
+
+<button id="float-login-btn" onclick="showLoginModal()">後台登入</button>
+
+<!-- 影片播放 Modal -->
+<div id="video-modal" class="video-modal" onclick="closeVideoModal()">
+  <div class="video-modal-content" onclick="event.stopPropagation()">
+    <button class="video-modal-close" onclick="closeVideoModal()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <div id="video-modal-player"></div>
+  </div>
+</div>
+
+<div id="admin-bar">
+  <div id="admin-avatar" style="display:none;margin-right:12px">
+    <img id="admin-avatar-img" src="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)">
+  </div>
+  <div class="admin-info" id="admin-info">訪客模式</div>
+  <div class="admin-ctrls">
+    <button class="admin-btn" data-role="super_admin" onclick="openHeroEditor()">✏ 首頁</button>
+    <button class="admin-btn" data-role="super_admin" onclick="openThemeEditor()">🎨 外觀</button>
+    <button class="admin-btn" data-role="super_admin" onclick="changeLogo()">🔄 Logo</button>
+    <button class="admin-btn" data-role="super_admin" onclick="manageCarousel()">🖼 輪播</button>
+    <button class="admin-btn" data-role="super_admin" onclick="manageCategories()">🏷 分類</button>
+    <button class="admin-btn" data-role="ops_admin" onclick="manageChecklist()">☑ 表單</button>
+    <button class="admin-btn" data-role="editor" onclick="editPortfolio(-1)">＋ 作品</button>
+    <button class="admin-btn" data-role="editor" onclick="showAnalytics()">📊 數據</button>
+    <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
+    <button class="admin-btn" data-role="super_admin" onclick="openBackendSettings()">⚙️ 後台設定</button>
+    <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
+    <button class="admin-btn" data-role="editor" onclick="editMyProfile()">👤 我的帳號</button>
+    <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
+    <button class="admin-btn logout" data-role="editor" onclick="adminLogout()">登出</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONSTANTS
+============================================================ */
+var KEY = 'MK5_v9_2025';
+
+var EDITOR_KEYS = {
+  'aboutDesc':1,'readyDesc':1,'card1Desc':1,'card2Desc':1,'readyTitle':1,
+  'aboutTitle':1,'missionTitle':1,'card1Title':1,'card2Title':1,'card1SubDesc':1,
+  'svc1Title':1,'svc2Title':1,'svc3Title':1,'svc4Title':1,'svc5Title':1,'svc6Title':1,'svc7Title':1,
+  'svc1Desc':1,'svc2Desc':1,'svc3Desc':1,'svc4Desc':1,'svc5Desc':1,'svc6Desc':1,'svc7Desc':1,
+  'procTitle1':1,'procTitle2':1,'procTitle3':1,'procTitle4':1,
+  'procTitle5':1,'procTitle6':1,'procTitle7':1,'procTitle8':1,
+  'procDesc1':1,'procDesc2':1,'procDesc3':1,'procDesc4':1,
+  'procDesc5':1,'procDesc6':1,'procDesc7':1,'procDesc8':1,
+  'contactTitle':1,'contactDesc':1,'contactEmail':1,'formNote':1,
+  'social.facebookLink':1,'social.instagramLink':1,'social.lineId':1
+};
+
+/* 營運長不能修改的欄位（超級執行長專屬） */
+var OPS_ADMIN_RESTRICTED = {
+  'heroEnTitle':1, 'heroZhTitle':1, 'brandName':1,
+  'label01':1, 'label02':1, 'label03':1, 'label04':1, 'label05':1
+};
+
+var DEF = {
+  logoData: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzk5NjNBIiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSI1MCIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iNDIiIGZvbnQtZmFtaWx5PSJzZXJpZiIgZmlsbD0iI0M5OTYzQSIgZm9udC13ZWlnaHQ9IjkwMCI+NTwvdGV4dD48L3N2Zz4=',
+  brandName: '馬克伍號影像工作室',
+  heroSubtitle: 'MARK NO.5 VIDEO STUDIO',
+  heroEnTitle: 'MARK NO.5',
+  heroZhTitle: '讓影像，真正為品牌帶來價值',
+  heroDesc: '馬克伍號影像工作室，專注於將影像轉化為品牌溝通工具，不只是製作影片，而是協助企業精準傳遞訊息、建立信任、提升轉換。',
+  label01: '01 · THE STORY', label02: '02 · WHAT WE DO', label03: '03 · HOW WE WORK',
+  label04: '04 · SELECTED WORKS', label05: '05 · GET IN TOUCH',
+  aboutHeading: '關於馬克伍號',
+  aboutDesc: '馬克伍號影像工作室創立至今八年，負責人擁有 19 年影像製作經驗，從產業最核心的後期製作出發，逐步橫跨完整影像製作領域，累積深厚且紮實的專業基礎。',
+  aboutTitle: '打造卓越視覺的<span style="color:var(--gold)">專業影像夥伴</span>',
+  readyDesc: '我們的起點，來自於早期參與知名電視節目後期製作，在高強度製作環境中，磨練出對節奏、敘事與細節的極致要求。隨著經驗累積，逐步拓展至：<ul><li>節目製作與內容企劃</li><li>商業廣告與品牌形象影片</li><li>動畫設計與視覺特效（VFX / Motion Graphics）</li><li>數位內容與新媒體影像整合</li></ul><p style="margin-top:10px;font-size:.88rem;color:var(--t3)">這些歷程，不只是技術的累積，更是對影像語言與市場溝通方式的深度理解。</p>',
+  readyTitle: '"Ready." 準備好，創造價值',
+  card1Desc: '從客戶接洽的第一刻起，我們都已準備好以最專業的姿態，為您創造價值。',
+  missionTitle: '我們的理念與承諾',
+  card1Title: '經驗與專業的累積', card1SubDesc: '創辦人擁有近 19 年深厚資歷，累積豐富實戰經驗與業界人脈。',
+  card2Title: '「伍號」的承諾與精神', card2Desc: '在任何拍攝現場，五秒倒數是徹底準備與專業到位的訊號。',
+  servicesHeading: '專業服務項目', servicesSub: '每個項目，都是一次精心策劃的視覺旅程。',
+  svc1Title: '動態影像拍攝', svc1Desc: '高規格攝影器材與專業運鏡，呈現電影級視覺質感。',
+  svc2Title: '商業廣告製作', svc2Desc: '從腳本發想到完片，精準傳遞品牌商業價值。',
+  svc3Title: '企業形象影片', svc3Desc: '打造具備深度的企業故事，全面提升品牌信任感。',
+  svc4Title: '創意動畫製作', svc4Desc: '2D/3D 動畫特效設計，突破實拍限制的視覺想像。',
+  svc5Title: '活動紀錄', svc5Desc: '典禮、發表會、演唱會等各類型活動現場專業多機記錄。',
+  svc6Title: '音樂錄影帶', svc6Desc: '融合視覺敘事與音樂情感，打造令人印象深刻的 MV 作品。',
+  svc7Title: '短影音製作', svc7Desc: '針對 Reels、TikTok、YouTube Shorts 平台優化的短影音內容。',
+  processHeading: '服務流程', processSub: '每個環節透明清晰，讓合作無後顧之憂。',
+  procTitle1: '概念討論', procTitle2: '報價與簽約', procTitle3: '腳本發想', procTitle4: '前期規劃',
+  procTitle5: '拍攝執行', procTitle6: '後製剪輯', procTitle7: '結案交付', procTitle8: '尾款支付',
+  procDesc1: '聆聽需求，確認影片風格與預算範圍。', procDesc2: '提供詳細報價，雙方確認後簽署合約。',
+  procDesc3: '編寫分鏡腳本，將概念轉化為畫面語言。', procDesc4: '確認場地、演員、道具與拍攝時程表。',
+  procDesc5: '專業團隊進駐，執行高規格影像拍攝。', procDesc6: '剪輯、調色、特效與音效，初剪審核修整。',
+  procDesc7: '確認成品無誤，交付高畫質影片檔案。', procDesc8: '完成結案後結清剩餘款項，期待再合作。',
+  portfolioHeading: '精選作品集',
+  contactTitle: '準備好開始了嗎？', contactDesc: '歡迎填寫表單，或透過以下方式直接聯繫我們。',
+  contactEmail: 'markno.5.studio@gmail.com',
+  formNote: '送出後將開啟您的郵件軟體，請確認內容後寄出。我們通常在 24 小時內回覆。',
+  pfLabelUrl: 'YouTube 連結', pfLabelTitle: '標題', pfLabelCat: '分類', pfLabelDesc: '說明',
+  footerTagline: '我們不追求過度表現，\n而是精準。\n不堆疊效果，\n而是選擇。\n不只是完成影像，\n而是讓影像成立。',
+  footerCompany: '馬克伍號影像工作室．統一編號：82150195',
+  footerCopyTpl: '© 2017–{YEAR} All Rights Reserved.',
+  social: { facebookLink: 'https://www.facebook.com/markno.5.studio', instagramLink: 'https://www.instagram.com/mark_no.5_studio/', lineId: 'marcus0403_c' },
+  pfCategories: ['品牌形象廣告','企業形象廣告','募資影片','活動紀錄','短影音','音樂錄影帶','動畫製作'],
+  formChecklist: ['拍攝影片','後期剪輯','動畫製作','4K 規格','HD 規格','直式影片','橫式影片','影片長度討論','2D 動畫','3D 動畫','燈光設備','專業收音','讀稿機','特殊需求'],
+  carouselImages: [
+    'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1800&q=80',
+    'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=1800&q=80',
+    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=1800&q=80',
+    'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1800&q=80',
+    'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1800&q=80'
+  ],
+  portfolio: [
+    { url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title:'年度品牌形象廣告', cat:'品牌形象廣告', description:'主軸強調品牌核心價值與社會責任，採紀實影像風格拍攝。' },
+    { url:'https://youtu.be/D-g8PIdXy2c', title:'科技公司企業形象影片', cat:'企業形象廣告', description:'強調創新與未來性，以光影特效呈現品牌科技感。' },
+    { url:'https://www.youtube.com/watch?v=9bZkp7q19f0', title:'獨立樂團音樂錄影帶', cat:'音樂錄影帶', description:'採用一鏡到底的超現實風格，呈現樂團獨特的音樂靈魂。' },
+    { url:'https://www.youtube.com/watch?v=3S3c_H6qW40', title:'國際論壇活動紀錄', cat:'活動紀錄', description:'捕捉講者精彩瞬間與現場熱烈氣氛，完整紀錄歷史時刻。' },
+    { url:'https://www.youtube.com/watch?v=kY8c2_nL-5Q', title:'產品介紹動畫', cat:'動畫製作', description:'清晰展示新產品運作原理與優勢，提升消費者購買意願。' }
+  ],
+  theme: { bgColor:'#09090B', bg2Color:'#0F0F12', bg3Color:'#161618', goldColor:'#C9963A', t1Color:'#F0EBE2', t2Color:'#C8C2B6', t3Color:'#9A948C', heroEnFont:'Google Sans Flex', heroEnSize:'7.5rem', heroZhSize:'2.6rem', scrollColor:'rgba(255,255,255,0.55)', scrollSize:'1rem', scrollFont:'Bebas Neue', labelSize:'0.92rem',
+    rippleColor:'rgba(201,150,58,0.85)', rippleOpacity:'0.85', rippleSize:'86px', rippleWidth:'3px',
+    procNumOpacity:'0.18', procNumHoverOpacity:'1.0'
+  },
+  backendSettings: {
+    autoLogoutMinutes: 5, // 預設 5 分鐘後自動登出
+    copyrightTemplate: '',
+    sendMessageEmail: '',
+    inboxGmailUrl: ''
+  },
+  gmailUrl: 'https://mail.google.com/mail/u/2/#inbox',
+  mailToAddress: '',
+  inbox: [],
+  editLog: [],
+  analytics: { pageViews:0, byDate:{}, byDevice:{}, bySource:{} },
+  users: [
+    { username:'mark', password:'mark888', role:'super_admin', name:'超級執行長 Mark', online:false, lastSeen:'', avatar:'' },
+    { username:'ops',  password:'ops888',  role:'ops_admin',   name:'營運長',           online:false, lastSeen:'', avatar:'' },
+    { username:'pro',  password:'pro123',  role:'editor',      name:'優秀人員',         online:false, lastSeen:'', avatar:'' }
+  ]
+};
+
+/* ============================================================
+   STATE
+============================================================ */
+var D = null, CU = null, CF = 'All', SQ = '', carIdx = 0, carTimer = null, PF_PAGE = 0;
+var PF_PER_PAGE = 12; // 4x3 佈局
+var autoLogoutTimer = null; // 自動登出計時器
+
+/* ============================================================
+   AUDIO ENGINE (no closures that break, pure functions)
+============================================================ */
+var _ac = null;
+function getAC() {
+  if (!_ac) { try { _ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+  return _ac;
+}
+function playTone(freq, type, vol, dur) {
+  var a = getAC(); if (!a) return;
+  var o = a.createOscillator(), g = a.createGain();
+  o.connect(g); g.connect(a.destination);
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+  o.start(); o.stop(a.currentTime + dur);
+}
+function playNoise(freq, vol, dur) {
+  var a = getAC(); if (!a) return;
+  var sr = a.sampleRate, buf = a.createBuffer(1, sr * dur, sr);
+  var dat = buf.getChannelData(0);
+  for (var i = 0; i < dat.length; i++) dat[i] = (Math.random() * 2 - 1) * Math.sin(i / dat.length * Math.PI) * 0.5;
+  var src = a.createBufferSource(), g = a.createGain(), fi = a.createBiquadFilter();
+  fi.type = 'bandpass'; fi.frequency.value = freq; fi.Q.value = 4;
+  src.buffer = buf; src.connect(fi); fi.connect(g); g.connect(a.destination);
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+  src.start();
+}
+function playHit() {
+  var freqs = [600, 900, 1400, 2200];
+  for (var i = 0; i < freqs.length; i++) playTone(freqs[i], 'triangle', 0.14 / (i + 1), 0.8 / (i + 1));
+}
+function playSweep(f1, f2, dur, vol) {
+  var a = getAC(); if (!a) return;
+  var o = a.createOscillator(), g = a.createGain();
+  o.connect(g); g.connect(a.destination);
+  o.type = 'sine';
+  o.frequency.setValueAtTime(f1, a.currentTime);
+  o.frequency.exponentialRampToValueAtTime(f2, a.currentTime + dur);
+  g.gain.setValueAtTime(0, a.currentTime);
+  g.gain.linearRampToValueAtTime(vol, a.currentTime + dur * 0.1);
+  g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+  o.start(); o.stop(a.currentTime + dur);
+}
+
+/* Sound schedule: [frame, function_name, args] */
+var SOUNDS = [
+  [5,  'noise', [180, 0.06, 0.08]], [15, 'noise', [220, 0.07, 0.09]],
+  [28, 'noise', [260, 0.08, 0.10]], [28, 'tone',  [1200,'square',0.08,0.04]],
+  [44, 'noise', [300, 0.09, 0.10]], [58, 'noise', [340, 0.10, 0.11]],
+  [58, 'tone',  [900,'square',0.10,0.05]], [72, 'noise', [400,0.11,0.11]],
+  [82, 'tone',  [1600,'square',0.18,0.08]],
+  [95, 'tone',  [1800,'square',0.16,0.06]], [95, 'noise', [500,0.08,0.06]],
+  [115,'tone',  [2000,'square',0.18,0.07]], [115,'tone', [1200,'square',0.13,0.05]],
+  [138,'sweep', [400,3200,0.3,0.06]], [188,'hit', []],
+  [225,'sweep', [800,200,0.5,0.05]], [275,'sweep',[300,2800,0.7,0.07]]
+];
+function fireSound(frame) {
+  for (var i = 0; i < SOUNDS.length; i++) {
+    if (SOUNDS[i][0] !== frame) continue;
+    var type = SOUNDS[i][1], args = SOUNDS[i][2];
+    if (type === 'tone')  playTone(args[0], args[1], args[2], args[3]);
+    if (type === 'noise') playNoise(args[0], args[1], args[2]);
+    if (type === 'hit')   playHit();
+    if (type === 'sweep') playSweep(args[0], args[1], args[2], args[3]);
+  }
+}
+
+/* ============================================================
+   CINEMATIC INTRO
+============================================================ */
+function runIntro() {
+  var ov = document.getElementById('intro-overlay');
+  var cv = document.getElementById('intro-canvas');
+  var logo = document.getElementById('intro-logo-el');
+  var tag = document.getElementById('intro-tagline');
+  if (!ov || !cv) return;
+  logo.src = D.logoData;
+  var ctx = cv.getContext('2d');
+  var W, H;
+  function sz() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+  sz(); window.addEventListener('resize', sz);
+
+  var N = 24;
+  var segs = [];
+  for (var si = 0; si < N; si++) {
+    segs.push({ i: si, angle: si / N * Math.PI * 2, at: Math.floor(Math.random() * 60 + 5), wop: 0 });
+  }
+
+  var frame = 0, raf;
+  var P = { wire:80, fill:135, iris:185, flash:215, rev:270, hold:350, out:390 };
+
+  function eO(t) { return 1 - (1-t)*(1-t); }
+  function eIO(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
+  function lerp(a, b, t) { return a + (b-a)*t; }
+
+  function drawSeg(cx, cy, R, s, ic, wA, fA) {
+    var a1 = s.angle, a2 = a1 + Math.PI*2/N - 0.02;
+    var ir = R * 0.28 * (1 - ic * 0.9);
+    ctx.beginPath(); ctx.arc(cx,cy,R,a1,a2); ctx.arc(cx,cy,ir,a2,a1,true); ctx.closePath();
+    if (fA > 0) {
+      var gr = ctx.createRadialGradient(cx,cy,ir,cx,cy,R);
+      gr.addColorStop(0, 'hsla(' + ((s.i/N)*30+10) + ',55%,' + (10+s.i*0.5) + '%,' + fA + ')');
+      gr.addColorStop(1, 'hsla(38,40%,4%,' + fA + ')');
+      ctx.fillStyle = gr; ctx.fill();
+    }
+    if (wA > 0) { ctx.strokeStyle = 'rgba(201,150,58,' + wA + ')'; ctx.lineWidth = 1; ctx.stroke(); }
+  }
+
+  function drawHalo(cx, cy, R, prog, alpha) {
+    var ang = -Math.PI/2 + prog * Math.PI*2;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx,cy,R, ang-0.65, ang);
+    ctx.strokeStyle = 'rgba(201,150,58,' + (alpha*0.9) + ')'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx + Math.cos(ang)*R, cy + Math.sin(ang)*R, 4, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,220,140,' + alpha + ')'; ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFlare(cx, cy, R, fx, alpha) {
+    if (alpha <= 0) return;
+    ctx.save();
+    var g = ctx.createRadialGradient(fx,cy,0,fx,cy,R*0.5);
+    g.addColorStop(0, 'rgba(255,240,200,' + (alpha*0.7) + ')');
+    g.addColorStop(0.3, 'rgba(255,200,120,' + (alpha*0.3) + ')');
+    g.addColorStop(1, 'rgba(201,150,58,0)');
+    ctx.beginPath(); ctx.arc(fx,cy,R*0.5,0,Math.PI*2); ctx.fillStyle = g; ctx.fill();
+    ctx.globalAlpha = alpha * 0.35;
+    ctx.fillStyle = 'rgba(255,240,200,0.6)'; ctx.fillRect(fx - W*0.5, cy-1, W, 2);
+    ctx.restore();
+  }
+
+  function anim() {
+    raf = requestAnimationFrame(anim);
+    frame++;
+    fireSound(frame);
+    ctx.clearRect(0,0,W,H); ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
+    var cx = W/2, cy = H/2, R = Math.min(W,H) * 0.28;
+
+    if (frame <= P.wire) {
+      for (var i = 0; i < segs.length; i++) {
+        var s = segs[i];
+        if (frame < s.at) continue;
+        var st = Math.min(1, (frame - s.at) / 12);
+        s.wop = eO(st) * 0.7;
+        drawSeg(cx, cy, R, s, 0, s.wop, 0);
+      }
+    } else if (frame <= P.fill) {
+      var t = (frame - P.wire) / (P.fill - P.wire);
+      for (var i = 0; i < segs.length; i++) {
+        var s = segs[i];
+        var st = Math.min(1, Math.max(0, (t - i/segs.length*0.5) * 3));
+        var fa = eO(st) * 0.85;
+        drawSeg(cx, cy, R, s, 0, s.wop * (1 - t*0.5), fa);
+        if (st > 0.5 && st < 0.7) {
+          var a = s.angle + Math.PI/N;
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(a)*R*0.65, cy + Math.sin(a)*R*0.65, 3, 0, Math.PI*2);
+          ctx.fillStyle = 'rgba(255,230,160,' + ((0.7-st)/0.2*0.8) + ')'; ctx.fill();
+        }
+      }
+    } else if (frame <= P.iris) {
+      var t = eIO((frame - P.fill) / (P.iris - P.fill));
+      for (var i = 0; i < segs.length; i++) drawSeg(cx, cy, R, segs[i], t, 0, 0.85);
+    } else if (frame <= P.flash) {
+      var t = (frame - P.iris) / (P.flash - P.iris);
+      for (var i = 0; i < segs.length; i++) drawSeg(cx, cy, R, segs[i], 1, 0, 0.85);
+      var fa = Math.sin(t * Math.PI);
+      var fg = ctx.createRadialGradient(cx,cy,0,cx,cy,R*2);
+      fg.addColorStop(0, 'rgba(255,235,180,' + (fa*0.95) + ')');
+      fg.addColorStop(0.3, 'rgba(201,150,58,' + (fa*0.5) + ')');
+      fg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(cx,cy,R*2,0,Math.PI*2); ctx.fillStyle = fg; ctx.fill();
+    } else if (frame <= P.rev) {
+      var t = eO((frame - P.flash) / (P.rev - P.flash));
+      var la = Math.min(1, t * 1.5);
+      for (var i = 0; i < segs.length; i++) drawSeg(cx, cy, R, segs[i], 1, 0, 0.85*(1-t*0.6));
+      logo.style.opacity = la;
+      logo.style.filter = 'blur(' + lerp(6,0,t) + 'px)';
+      logo.style.transform = 'scale(' + lerp(1.06,1,t) + ')';
+      logo.style.border = '2px solid rgba(201,150,58,' + (la*0.9) + ')';
+      logo.style.boxShadow = '0 0 ' + (40*la) + 'px rgba(201,150,58,' + (la*0.6) + '),0 0 ' + (80*la) + 'px rgba(201,150,58,' + (la*0.18) + ')';
+      tag.style.opacity = Math.max(0, t - 0.5) * 2;
+      tag.style.transform = 'translateY(' + (1 - Math.max(0, t-0.3)) * 15 + 'px)';
+    } else if (frame <= P.hold) {
+      var t = (frame - P.rev) / (P.hold - P.rev);
+      logo.style.opacity = '1'; logo.style.filter = 'blur(0px)'; logo.style.transform = 'scale(1)';
+      for (var i = 0; i < segs.length; i++) drawSeg(cx, cy, R, segs[i], 1, 0, Math.max(0, 0.3-t*0.3));
+      if (t < 0.7) drawHalo(cx, cy, R*1.02, t/0.7, 0.9 * (1 - Math.max(0, (t/0.7 - 0.85) / 0.15)));
+      if (t > 0.3 && t < 0.85) {
+        var fp = (t - 0.3) / 0.55;
+        drawFlare(cx, cy, R, lerp(cx-W*0.4, cx+W*0.4, fp), Math.sin(fp * Math.PI) * 0.7);
+      }
+      tag.style.opacity = '1';
+    } else {
+      var t = eIO((frame - P.hold) / (P.out - P.hold));
+      logo.style.opacity = 1 - t;
+      logo.style.transform = 'scale(' + (1 - t*0.06) + ')';
+      tag.style.opacity = 1 - t;
+      ctx.fillStyle = 'rgba(0,0,0,' + t + ')'; ctx.fillRect(0,0,W,H);
+      if (frame >= P.out) {
+        cancelAnimationFrame(raf);
+        ov.style.transition = 'opacity .4s ease';
+        ov.style.opacity = '0';
+        setTimeout(function() { ov.style.display = 'none'; initPage(); }, 440);
+      }
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+/* ============================================================
+   BOOT
+============================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('click', function() { try { getAC(); } catch(e) {} }, { once: true });
+  loadData();
+  applyTheme();
+  runIntro();
+  bindEvents();
+  
+  // ESC 鍵關閉影片 modal
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+      var modal = document.getElementById('video-modal');
+      if (modal && modal.classList.contains('active')) {
+        closeVideoModal();
+      }
+    }
+  });
+  
+  // 用戶活動監聽 - 重置自動登出計時器
+  var activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+  activityEvents.forEach(function(event) {
+    document.addEventListener(event, function() {
+      resetAutoLogout();
+    }, { passive: true });
+  });
+});
+
+function loadData() {
+  try {
+    var s = localStorage.getItem(KEY);
+    if (s) {
+      var p = JSON.parse(s);
+      D = Object.assign({}, DEF, p);
+      D.social = Object.assign({}, DEF.social, p.social || {});
+      D.analytics = Object.assign({}, DEF.analytics, p.analytics || {});
+      D.theme = Object.assign({}, DEF.theme, p.theme || {});
+      if (!D.logoData || D.logoData.length < 50) D.logoData = DEF.logoData;
+      if (!D.carouselImages || !D.carouselImages.length) D.carouselImages = DEF.carouselImages.slice();
+      if (!D.pfCategories || !D.pfCategories.length) D.pfCategories = DEF.pfCategories.slice();
+      if (!D.formChecklist || !D.formChecklist.length) D.formChecklist = DEF.formChecklist.slice();
+      if (!D.users || !D.users.length) D.users = JSON.parse(JSON.stringify(DEF.users));
+      if (!D.editLog) D.editLog = [];
+    } else {
+      D = JSON.parse(JSON.stringify(DEF));
+      persist();
+    }
+  } catch(e) {
+    D = JSON.parse(JSON.stringify(DEF));
+  }
+  try { var cu = sessionStorage.getItem('mk5cu'); if (cu) CU = JSON.parse(cu); } catch(e) {}
+  
+  // 如果已登入，啟動自動登出計時器
+  if (CU) {
+    startAutoLogout();
+  }
+}
+
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(D)); }
+  catch(e) { if (e.name === 'QuotaExceededError') Swal.fire({ title:'儲存空間已滿', icon:'error' }); }
+}
+
+/* ============================================================
+   THEME
+============================================================ */
+function applyTheme() {
+  var t = D.theme || DEF.theme;
+  var r = document.documentElement.style;
+  r.setProperty('--bg', t.bgColor);
+  r.setProperty('--bg2', t.bg2Color);
+  r.setProperty('--bg3', t.bg3Color);
+  r.setProperty('--gold', t.goldColor);
+  r.setProperty('--t1', t.t1Color);
+  r.setProperty('--t2', t.t2Color);
+  r.setProperty('--t3', t.t3Color);
+  r.setProperty('--hero-en-font', "'" + (t.heroEnFont || 'Iansui') + "','Noto Serif TC',sans-serif");
+  r.setProperty('--hero-en-size', t.heroEnSize || '7.5rem');
+  r.setProperty('--hero-zh-size', t.heroZhSize || '2.6rem');
+  r.setProperty('--scroll-color', t.scrollColor || 'rgba(255,255,255,0.55)');
+  r.setProperty('--scroll-size', t.scrollSize || '1rem');
+  r.setProperty('--scroll-font', "'" + (t.scrollFont || 'Bebas Neue') + "',sans-serif");
+  r.setProperty('--label-size', t.labelSize || '0.92rem');
+  /* Ripple settings */
+  var rippleOpacity = parseFloat(t.rippleOpacity || '0.85');
+  var rippleColorBase = t.rippleColor || 'rgba(201,150,58,0.85)';
+  
+  // 如果顏色包含 rgba，替換 alpha 值；否則使用原值
+  var rippleColorFinal = rippleColorBase;
+  if (rippleColorBase.indexOf('rgba') === 0) {
+    // 提取 rgb 部分並重新組合
+    var rgbMatch = rippleColorBase.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch) {
+      rippleColorFinal = 'rgba(' + rgbMatch[1] + ',' + rgbMatch[2] + ',' + rgbMatch[3] + ',' + rippleOpacity + ')';
+    }
+  }
+  
+  r.setProperty('--ripple-color', rippleColorFinal);
+  r.setProperty('--ripple-size', t.rippleSize || '86px');
+  r.setProperty('--ripple-width', t.rippleWidth || '3px');
+  /* Process number dim */
+  var pno = parseFloat(t.procNumOpacity || '0.18');
+  var pnho = parseFloat(t.procNumHoverOpacity || '1.0');
+  document.querySelectorAll('.proc-num').forEach(function(el) {
+    el.style.color = 'rgba(255,255,255,' + pno + ')';
+  });
+  // Add a <style> block for hover state
+  var styleId = 'proc-hover-style';
+  var existing = document.getElementById(styleId);
+  if (existing) existing.remove();
+  var st = document.createElement('style');
+  st.id = styleId;
+  st.textContent = '.process-step:hover .proc-num{color:rgba(201,150,58,' + pnho + ')!important}';
+  document.head.appendChild(st);
+}
+
+/* ============================================================
+   INIT PAGE (runs after intro)
+============================================================ */
+function initPage() {
+  updateDOM();
+  initCarousel();
+  initHeaderScroll();
+  initReveal();
+  initRipple();
+  trackVisit();
+  renderChecklist();
+  renderFooterCopy();
+  initClock();
+  initWeather();
+  initAdminBarHover();
+}
+
+/* ============================================================
+   EVENTS
+============================================================ */
+function bindEvents() {
+  document.getElementById('pf-search').addEventListener('input', function(e) {
+    SQ = e.target.value.toLowerCase().trim(); CF = 'All'; renderPF();
+  });
+  document.getElementById('contact-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var nm = document.getElementById('f-name').value;
+    var em = document.getElementById('f-email').value;
+    var ph = document.getElementById('f-phone') ? document.getElementById('f-phone').value : '';
+    var mg = document.getElementById('f-msg').value;
+    var checks = document.querySelectorAll('#form-checks input:checked');
+    var needsArr = [];
+    for (var i = 0; i < checks.length; i++) needsArr.push(checks[i].value);
+    var times = document.querySelectorAll('input[name="time"]:checked');
+    var timeArr = [];
+    for (var i = 0; i < times.length; i++) timeArr.push(times[i].value);
+    var needsStr = needsArr.length ? '\n\n專案需求：' + needsArr.join('、') : '';
+    var timeStr = timeArr.length ? '\n可聯繫時間：' + timeArr.join('、') : '';
+    var phoneStr = ph ? '\n電話：' + ph : '';
+    // Save to inbox
+    if (!D.inbox) D.inbox = [];
+    D.inbox.unshift({ date: new Date().toLocaleString('zh-TW'), name: nm, email: em, phone: ph, msg: mg, needs: needsArr, times: timeArr, replied: false });
+    if (D.inbox.length > 200) D.inbox = D.inbox.slice(0, 200);
+    persist();
+    var toAddr = D.mailToAddress || D.contactEmail;
+    var sub = encodeURIComponent('【影像合作詢問】來自 ' + nm);
+    var bod = encodeURIComponent('姓名：' + nm + '\n信箱：' + em + phoneStr + needsStr + timeStr + '\n\n補充說明：\n' + mg);
+    window.location.href = 'mailto:' + toAddr + '?subject=' + sub + '&body=' + bod;
+  });
+  var cb = document.getElementById('hero-contact-btn');
+  if (cb) cb.addEventListener('mouseenter', function() {
+    var b = document.getElementById('header-brand');
+    if (b) { b.style.animation = 'none'; requestAnimationFrame(function() { b.style.animation = 'brandShake .55s ease'; }); }
+  });
+}
+
+/* ============================================================
+   ROLE CHECK
+============================================================ */
+function canEdit(key) {
+  if (!CU) return false;
+  
+  // 超級執行長：可編輯所有欄位
+  if (CU.role === 'super_admin') return true;
+  
+  // 營運長：不能編輯首頁標題、品牌名、主要標籤
+  if (CU.role === 'ops_admin') {
+    if (OPS_ADMIN_RESTRICTED[key]) return false;
+    return true; // 其他欄位都可以編輯
+  }
+  
+  // 優秀人員：僅限 EDITOR_KEYS 定義的欄位
+  if (CU.role === 'editor') {
+    return !!EDITOR_KEYS[key];
+  }
+  
+  return false;
+}
+
+/* ============================================================
+   DOM UPDATE
+============================================================ */
+function getVal(obj, key) {
+  if (key.indexOf('.') !== -1) {
+    var parts = key.split('.'); return obj[parts[0]] ? obj[parts[0]][parts[1]] : undefined;
+  }
+  return obj[key];
+}
+
+function updateDOM() {
+  var logos = ['site-logo','footer-logo'];
+  for (var i = 0; i < logos.length; i++) {
+    var el = document.getElementById(logos[i]);
+    if (el) el.src = D.logoData;
+  }
+  var ee = document.getElementById('email-link'), fe = document.getElementById('footer-email');
+  if (ee) { ee.href = 'mailto:' + D.contactEmail; ee.textContent = D.contactEmail; }
+  if (fe) { fe.href = 'mailto:' + D.contactEmail; fe.textContent = D.contactEmail; }
+
+  var lh = 'https://line.me/ti/p/~' + (D.social.lineId || '');
+  var lineIds = ['nav-line-btn','mobile-line-btn'];
+  for (var i = 0; i < lineIds.length; i++) { var el = document.getElementById(lineIds[i]); if (el) el.href = lh; }
+
+  var pu = encodeURIComponent(location.href);
+  var sfb = document.getElementById('share-fb'), sln = document.getElementById('share-line');
+  if (sfb) sfb.href = 'https://www.facebook.com/sharer/sharer.php?u=' + pu;
+  if (sln) sln.href = 'https://social-plugins.line.me/lineit/share?url=' + pu;
+
+  var els = document.querySelectorAll('[data-key]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i], k = el.getAttribute('data-key'), v = getVal(D, k);
+    if (v !== undefined && v !== null) {
+      if (el.getAttribute('data-type') === 'html') el.innerHTML = v;
+      else el.textContent = v;
+    }
+    var editable = canEdit(k);
+    el.contentEditable = editable ? 'true' : 'false';
+    el.style.cursor = editable ? 'text' : '';
+  }
+  renderFooterCopy();
+  renderSocial();
+  renderFooterSocial();
+  renderPF();
+  updateAdminUI();
+}
+
+function renderFooterCopy() {
+  var el = document.getElementById('footer-copy-el'); if (!el) return;
+  var tpl = D.footerCopyTpl || DEF.footerCopyTpl;
+  el.textContent = tpl.replace('{YEAR}', new Date().getFullYear());
+}
+
+/* ============================================================
+   SAVE
+============================================================ */
+window.saveChanges = function(showAlert) {
+  if (showAlert === undefined) showAlert = true;
+  var changed = [];
+  var els = document.querySelectorAll('[data-key]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i], k = el.getAttribute('data-key');
+    if (!canEdit(k)) continue;
+    var v = el.getAttribute('data-type') === 'html' ? el.innerHTML : el.innerText.trim();
+    var old = getVal(D, k);
+    if (k.indexOf('.') !== -1) { var p = k.split('.'); if (D[p[0]]) D[p[0]][p[1]] = v; }
+    else D[k] = v;
+    if (String(old) !== String(v)) changed.push(k);
+  }
+  if (CU && changed.length) {
+    D.editLog.unshift({ user:CU.name, username:CU.username, role:CU.role, date:new Date().toLocaleString('zh-TW'), keys:changed, snapshot:JSON.stringify(D) });
+    if (D.editLog.length > 100) D.editLog = D.editLog.slice(0, 100);
+  }
+  persist(); updateDOM();
+  if (showAlert) Swal.fire({ title:'✓ 儲存成功', timer:1200, showConfirmButton:false, icon:'success' });
+};
+
+/* ============================================================
+   CAROUSEL
+============================================================ */
+function initCarousel() {
+  var tr = document.getElementById('carousel-track'), dt = document.getElementById('carousel-dots');
+  if (!tr || !dt) return;
+  tr.innerHTML = ''; dt.innerHTML = '';
+  for (var i = 0; i < D.carouselImages.length; i++) {
+    (function(idx, src) {
+      var s = document.createElement('div');
+      s.className = 'carousel-slide' + (idx === 0 ? ' active pan-r' : '');
+      s.style.backgroundImage = "url('" + src + "')";
+      tr.appendChild(s);
+      var d = document.createElement('button');
+      d.className = 'carousel-dot' + (idx === 0 ? ' active' : '');
+      d.onclick = function() { goSlide(idx); };
+      dt.appendChild(d);
+    })(i, D.carouselImages[i]);
+  }
+  carTimer = setInterval(function() { goSlide((carIdx + 1) % D.carouselImages.length); }, 6000);
+}
+function goSlide(idx) {
+  var slides = document.querySelectorAll('.carousel-slide'), dots = document.querySelectorAll('.carousel-dot');
+  if (!slides.length) return;
+  slides[carIdx].className = 'carousel-slide';
+  dots[carIdx].className = 'carousel-dot';
+  carIdx = idx;
+  slides[carIdx].className = 'carousel-slide active ' + (carIdx % 2 === 0 ? 'pan-r' : 'pan-l');
+  dots[carIdx].className = 'carousel-dot active';
+  clearInterval(carTimer);
+  carTimer = setInterval(function() { goSlide((carIdx + 1) % D.carouselImages.length); }, 6000);
+}
+
+/* ============================================================
+   RIPPLE — fixed centering with transform
+============================================================ */
+function initRipple() {
+  document.addEventListener('click', function(e) {
+    var r = document.createElement('div');
+    r.className = 'mk5-ripple';
+    r.style.left = e.clientX + 'px';
+    r.style.top = e.clientY + 'px';
+    document.body.appendChild(r);
+    r.addEventListener('animationend', function() { if (r.parentNode) r.parentNode.removeChild(r); });
+  }, { passive: true });
+}
+
+/* ============================================================
+   ADMIN BAR HOVER (滑鼠移至底部時滑出)
+============================================================ */
+function initAdminBarHover() {
+  var adminBar = document.getElementById('admin-bar');
+  if (!adminBar) return;
+  
+  var hoverThreshold = 100; // 底部 100px 範圍
+  var checkTimer = null;
+  
+  document.addEventListener('mousemove', function(e) {
+    if (!CU) return; // 未登入時不啟用
+    
+    var windowHeight = window.innerHeight;
+    var mouseY = e.clientY;
+    var distanceFromBottom = windowHeight - mouseY;
+    
+    if (distanceFromBottom <= hoverThreshold) {
+      adminBar.classList.add('hover');
+      
+      // 清除計時器
+      if (checkTimer) clearTimeout(checkTimer);
+    } else {
+      // 延遲移除，避免閃爍
+      if (checkTimer) clearTimeout(checkTimer);
+      checkTimer = setTimeout(function() {
+        if (!adminBar.matches(':hover')) {
+          adminBar.classList.remove('hover');
+        }
+      }, 300);
+    }
+  });
+  
+  // 當滑鼠離開 admin bar 時，檢查滑鼠位置
+  adminBar.addEventListener('mouseleave', function() {
+    if (checkTimer) clearTimeout(checkTimer);
+    checkTimer = setTimeout(function() {
+      adminBar.classList.remove('hover');
+    }, 300);
+  });
+}
+
+/* ============================================================
+   SOCIAL
+============================================================ */
+function renderSocial() {
+  var c = document.getElementById('social-container'), ed = document.getElementById('social-edit');
+  if (!c) return;
+  var defs = [
+    { k:'facebookLink', i:'fab fa-facebook-f', l:'Facebook' },
+    { k:'instagramLink', i:'fab fa-instagram', l:'Instagram' },
+    { k:'lineId', i:'fab fa-line', l:'LINE', pre:'https://line.me/ti/p/~', isId:true }
+  ];
+  var html = '';
+  for (var i = 0; i < defs.length; i++) {
+    var d = defs[i], v = D.social[d.k] || '', h = d.isId ? d.pre + v : v;
+    html += '<a href="' + h + '" target="_blank" rel="noopener" class="social-btn" title="' + d.l + '"><i class="' + d.i + '"></i></a>';
+  }
+  c.innerHTML = html;
+  var lh = 'https://line.me/ti/p/~' + (D.social.lineId || '');
+  var lineEls = ['nav-line-btn','mobile-line-btn'];
+  for (var i = 0; i < lineEls.length; i++) { var el = document.getElementById(lineEls[i]); if (el) el.href = lh; }
+  if (CU && ed) {
+    ed.classList.add('show');
+    var edHtml = '<strong style="color:var(--gold)">社群連結設定：</strong><br>';
+    for (var i = 0; i < defs.length; i++) {
+      var d = defs[i];
+      edHtml += '<div style="margin-top:8px"><span style="color:var(--gold);font-size:.75rem">' + d.l + ':</span> ';
+      edHtml += '<span contenteditable="true" data-sk="' + d.k + '" style="color:var(--t2);font-size:.75rem;outline:1px dashed rgba(201,150,58,.3);padding:2px 4px">' + (D.social[d.k] || '') + '</span></div>';
+    }
+    ed.innerHTML = edHtml;
+    var spans = ed.querySelectorAll('[data-sk]');
+    for (var i = 0; i < spans.length; i++) {
+      (function(span) {
+        span.addEventListener('blur', function() { D.social[span.getAttribute('data-sk')] = span.textContent.trim(); renderSocial(); renderFooterSocial(); });
+      })(spans[i]);
+    }
+  } else if (ed) ed.classList.remove('show');
+}
+function renderFooterSocial() {
+  var c = document.getElementById('footer-social'); if (!c) return;
+  var defs = [
+    { k:'facebookLink', i:'fab fa-facebook-f' },
+    { k:'instagramLink', i:'fab fa-instagram' },
+    { k:'lineId', i:'fab fa-line', isId:true, pre:'https://line.me/ti/p/~' }
+  ];
+  var html = '';
+  for (var i = 0; i < defs.length; i++) {
+    var d = defs[i], v = D.social[d.k] || '', h = d.isId ? d.pre + v : v;
+    html += '<a href="' + h + '" target="_blank" rel="noopener" class="fsocial-btn"><i class="' + d.i + '"></i></a>';
+  }
+  c.innerHTML = html;
+}
+
+/* ============================================================
+   PORTFOLIO — click-to-play with youtube-nocookie.com
+============================================================ */
+function getYTId(url) {
+  if (!url) return '';
+  var m = url.match(/(?:v=|\/embed\/|\/v\/|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : (url.length === 11 ? url : '');
+}
+
+function renderPF() {
+  var c = document.getElementById('portfolio-list'), f = document.getElementById('pf-filters');
+  var paginationDiv = document.getElementById('pf-pagination');
+  if (!c || !f) return;
+
+  var cats = ['All'].concat(D.pfCategories);
+  var fHtml = '';
+  for (var i = 0; i < cats.length; i++) {
+    var ct = cats[i];
+    fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct + '\')">' + (ct === 'All' ? '全部' : ct) + '</button>';
+  }
+  f.innerHTML = fHtml;
+
+  var items = D.portfolio.slice();
+  if (SQ) {
+    items = items.filter(function(item) {
+      return item.title.toLowerCase().indexOf(SQ) !== -1 || item.cat.toLowerCase().indexOf(SQ) !== -1 || item.description.toLowerCase().indexOf(SQ) !== -1;
+    });
+  } else if (CF !== 'All') {
+    items = items.filter(function(item) { return item.cat === CF; });
+  }
+
+  if (!items.length) { 
+    c.innerHTML = '<div class="pf-empty">沒有找到符合的作品</div>'; 
+    if (paginationDiv) paginationDiv.innerHTML = '';
+    return; 
+  }
+
+  // 計算分頁
+  var totalPages = Math.ceil(items.length / PF_PER_PAGE);
+  if (PF_PAGE >= totalPages) PF_PAGE = totalPages - 1;
+  if (PF_PAGE < 0) PF_PAGE = 0;
+  
+  var start = PF_PAGE * PF_PER_PAGE;
+  var end = Math.min(start + PF_PER_PAGE, items.length);
+  var pageItems = items.slice(start, end);
+
+  var html = '';
+  for (var i = 0; i < pageItems.length; i++) {
+    var item = pageItems[i], vid = getYTId(item.url);
+    if (!vid) continue;
+    var idx = D.portfolio.indexOf(item);
+    var thumb = 'https://img.youtube.com/vi/' + vid + '/hqdefault.jpg';
+    html += '<div class="pf-item" data-vid="' + vid + '" onmouseenter="startHoverPreview(this)" onmouseleave="stopHoverPreview(this)">';
+    html += '<div class="pf-admin-btns' + (CU ? ' show' : '') + '">';
+    html += '<button class="pf-admin-btn" onclick="event.stopPropagation();editPortfolio(' + idx + ')"><i class="fa-solid fa-pen fa-xs"></i></button>';
+    html += '<button class="pf-admin-btn del" onclick="event.stopPropagation();delPortfolio(' + idx + ')"><i class="fa-solid fa-trash fa-xs"></i></button>';
+    html += '</div>';
+    html += '<div class="pf-thumb-wrap" onclick="playVid(this)">';
+    html += '<div class="pf-thumb" style="background-image:url(\'' + thumb + '\')"></div>';
+    html += '<div class="pf-overlay"><i class="fa-brands fa-youtube pf-play-icon"></i></div>';
+    html += '<button class="pf-close-btn" onclick="event.stopPropagation();closeVid(this)"><i class="fa-solid fa-xmark"></i></button>';
+    html += '<span class="pf-badge">' + item.cat + '</span>';
+    html += '</div>';
+    html += '<div class="pf-info"><h3>' + item.title + '</h3><p>' + item.description + '</p></div>';
+    html += '</div>';
+  }
+  c.innerHTML = html;
+  
+  // 渲染分頁按鈕
+  if (paginationDiv && totalPages > 1) {
+    var pagHtml = '';
+    
+    // 上一頁按鈕
+    pagHtml += '<button class="pf-page-btn" onclick="goToPage(' + Math.max(0, PF_PAGE - 1) + ')" ' + (PF_PAGE === 0 ? 'disabled' : '') + '>◀</button>';
+    
+    // 頁碼按鈕
+    var maxButtons = 10;
+    var startPage = Math.max(0, PF_PAGE - 4);
+    var endPage = Math.min(totalPages, startPage + maxButtons);
+    
+    if (endPage - startPage < maxButtons) {
+      startPage = Math.max(0, endPage - maxButtons);
+    }
+    
+    for (var p = startPage; p < endPage; p++) {
+      pagHtml += '<button class="pf-page-btn' + (p === PF_PAGE ? ' active' : '') + '" onclick="goToPage(' + p + ')">' + (p + 1) + '</button>';
+    }
+    
+    if (endPage < totalPages) {
+      pagHtml += '<span style="color:var(--t3);padding:0 8px">...</span>';
+    }
+    
+    // 下一頁按鈕
+    pagHtml += '<button class="pf-page-btn" onclick="goToPage(' + Math.min(totalPages - 1, PF_PAGE + 1) + ')" ' + (PF_PAGE === totalPages - 1 ? 'disabled' : '') + '>▶</button>';
+    
+    paginationDiv.innerHTML = pagHtml;
+  } else if (paginationDiv) {
+    paginationDiv.innerHTML = '';
+  }
+}
+
+window.goToPage = function(page) {
+  PF_PAGE = page;
+  renderPF();
+  document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
+};
+
+/* Hover preview system */
+var hoverTimeouts = {};
+
+/* Hover preview disabled - using static thumbnails instead */
+window.startHoverPreview = function(item) {
+  // 不再載入 YouTube iframe 進行預覽
+  // 改用靜態封面圖，節省資源並避免衝突
+};
+
+window.stopHoverPreview = function(item) {
+  // 預覽功能已停用
+};
+
+window.playVid = function(wrap) {
+  var item = wrap.parentElement;
+  var vid = item.getAttribute('data-vid');
+  
+  if (!vid) {
+    alert('找不到影片 ID');
+    return;
+  }
+  
+  openVideoModal(vid);
+};
+
+window.openVideoModal = function(videoId) {
+  var modal = document.getElementById('video-modal');
+  var player = document.getElementById('video-modal-player');
+  
+  if (!modal || !player) return;
+  
+  // 使用您提供的 iframe 格式
+  player.innerHTML = '<iframe width="100%" height="100%" src="https://www.youtube.com/embed/' + videoId + '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+  
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeVideoModal = function() {
+  var modal = document.getElementById('video-modal');
+  var player = document.getElementById('video-modal-player');
+  
+  player.innerHTML = '';
+  modal.classList.remove('active');
+  document.body.style.overflow = '';
+};
+
+window.closeVid = function(btn) {
+  var item = btn.parentElement ? btn.parentElement.parentElement : null;
+  if (!item) return;
+  var iframe = item.querySelector('.pf-yt-iframe');
+  if (iframe) iframe.parentNode.removeChild(iframe);
+  item.classList.remove('playing');
+};
+
+window.setFilter = function(ct) { CF = ct; SQ = ''; PF_PAGE = 0; document.getElementById('pf-search').value = ''; renderPF(); };
+
+window.editPortfolio = function(idx) {
+  var item = idx === -1 ? { url:'', title:'', cat:'', description:'' } : D.portfolio[idx];
+  var catOpts = '';
+  for (var i = 0; i < D.pfCategories.length; i++) {
+    catOpts += '<option value="' + D.pfCategories[i] + '"' + (D.pfCategories[i] === item.cat ? ' selected' : '') + '>' + D.pfCategories[i] + '</option>';
+  }
+  catOpts += '<option value="__custom__">＋ 自訂分類</option>';
+  Swal.fire({
+    title: idx === -1 ? '新增作品' : '編輯作品', width: 540,
+    html: '<input id="pu" class="swal2-input" value="' + (item.url||'') + '" placeholder="YouTube 完整網址">' +
+          '<input id="pt" class="swal2-input" value="' + (item.title||'') + '" placeholder="作品標題">' +
+          '<select id="pc" class="swal2-input">' + catOpts + '</select>' +
+          '<input id="pc2" class="swal2-input" placeholder="自訂分類名稱" style="display:none;margin-top:4px">' +
+          '<textarea id="pd" class="swal2-textarea" placeholder="說明">' + (item.description||'') + '</textarea>',
+    didOpen: function() {
+      document.getElementById('pc').onchange = function() {
+        document.getElementById('pc2').style.display = this.value === '__custom__' ? 'block' : 'none';
+      };
+    },
+    showCancelButton: true, confirmButtonText: idx === -1 ? '新增' : '儲存', cancelButtonText: '取消',
+    preConfirm: function() {
+      var url = document.getElementById('pu').value.trim();
+      var title = document.getElementById('pt').value.trim();
+      var sel = document.getElementById('pc').value;
+      var cat = sel === '__custom__' ? document.getElementById('pc2').value.trim() : sel;
+      if (!url || !title || !cat) { Swal.showValidationMessage('請填寫所有必填欄位'); return false; }
+      if (!getYTId(url)) { Swal.showValidationMessage('請輸入有效的 YouTube 連結'); return false; }
+      if (sel === '__custom__' && cat && D.pfCategories.indexOf(cat) === -1) D.pfCategories.push(cat);
+      return { url:url, title:title, cat:cat, description:document.getElementById('pd').value.trim() };
+    }
+  }).then(function(r) {
+    if (r.isConfirmed && r.value) {
+      if (idx === -1) D.portfolio.push(r.value); else D.portfolio[idx] = r.value;
+      saveChanges(false);
+    }
+  });
+};
+
+window.delPortfolio = function(idx) {
+  Swal.fire({ title:'確定刪除？', text:'「' + D.portfolio[idx].title + '」', icon:'warning', showCancelButton:true, confirmButtonText:'刪除', cancelButtonText:'取消', confirmButtonColor:'#B52020' })
+  .then(function(r) { if (r.isConfirmed) { D.portfolio.splice(idx, 1); saveChanges(false); } });
+};
+
+/* ============================================================
+   CHECKLIST
+============================================================ */
+function renderChecklist() {
+  var w = document.getElementById('form-checks'); if (!w) return;
+  var html = '';
+  var list = D.formChecklist || [];
+  for (var i = 0; i < list.length; i++) {
+    html += '<label class="form-check-item"><input type="checkbox" name="need" value="' + list[i] + '"><span>' + list[i] + '</span></label>';
+  }
+  w.innerHTML = html;
+}
+
+window.manageChecklist = function() {
+  function lh() {
+    var list = D.formChecklist || [], html = '';
+    for (var i = 0; i < list.length; i++) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="flex:1;font-size:.85rem;color:var(--t1)">' + list[i] + '</span>' +
+        '<button onclick="clD(' + i + ')" style="background:transparent;border:1px solid rgba(181,32,32,.4);color:var(--red);padding:2px 10px;cursor:pointer;font-size:.78rem">刪除</button></div>';
+    }
+    return html;
+  }
+  window.clD = function(i) { D.formChecklist.splice(i, 1); document.getElementById('clw').innerHTML = lh(); };
+  Swal.fire({
+    title: '☑ 管理表單選項', width: 460,
+    html: '<div id="clw" style="text-align:left;max-height:260px;overflow-y:auto">' + lh() + '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:12px"><input id="clni" class="swal2-input" style="flex:1;margin:0" placeholder="新選項名稱">' +
+          '<button onclick="if(document.getElementById(\'clni\').value.trim()){if(!D.formChecklist)D.formChecklist=[];D.formChecklist.push(document.getElementById(\'clni\').value.trim());document.getElementById(\'clw\').innerHTML=lh();document.getElementById(\'clni\').value=\'\'}" style="background:var(--gold);border:none;color:var(--bg);padding:0 16px;cursor:pointer;font-weight:700">新增</button></div>',
+    showCancelButton: true, confirmButtonText: '儲存'
+  }).then(function(r) { if (r.isConfirmed) { persist(); renderChecklist(); } });
+};
+
+/* ============================================================
+   CATEGORIES
+============================================================ */
+window.manageCategories = function() {
+  function lh() {
+    var html = '';
+    for (var i = 0; i < D.pfCategories.length; i++) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="flex:1;font-size:.85rem;color:var(--t1)">' + D.pfCategories[i] + '</span>' +
+        '<button onclick="mcU(' + i + ')" style="background:var(--bg3);border:1px solid var(--border);color:var(--t2);padding:3px 8px;cursor:pointer">↑</button>' +
+        '<button onclick="mcDn(' + i + ')" style="background:var(--bg3);border:1px solid var(--border);color:var(--t2);padding:3px 8px;cursor:pointer">↓</button>' +
+        '<button onclick="mcDl(' + i + ')" style="background:transparent;border:1px solid rgba(181,32,32,.4);color:var(--red);padding:3px 8px;cursor:pointer">刪</button></div>';
+    }
+    return html;
+  }
+  window.mcU = function(i) { if (i>0){var t=D.pfCategories[i];D.pfCategories[i]=D.pfCategories[i-1];D.pfCategories[i-1]=t;document.getElementById('catw').innerHTML=lh();} };
+  window.mcDn = function(i) { if (i<D.pfCategories.length-1){var t=D.pfCategories[i];D.pfCategories[i]=D.pfCategories[i+1];D.pfCategories[i+1]=t;document.getElementById('catw').innerHTML=lh();} };
+  window.mcDl = function(i) { if(D.pfCategories.length>1){D.pfCategories.splice(i,1);document.getElementById('catw').innerHTML=lh();} };
+  Swal.fire({
+    title: '🏷 管理作品分類', width: 480,
+    html: '<div id="catw" style="text-align:left;max-height:260px;overflow-y:auto">' + lh() + '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:12px"><input id="catn" class="swal2-input" style="flex:1;margin:0" placeholder="新分類名稱">' +
+          '<button onclick="if(document.getElementById(\'catn\').value.trim()){D.pfCategories.push(document.getElementById(\'catn\').value.trim());document.getElementById(\'catw\').innerHTML=lh();document.getElementById(\'catn\').value=\'\'}" style="background:var(--gold);border:none;color:var(--bg);padding:0 16px;cursor:pointer;font-weight:700">新增</button></div>',
+    showCancelButton: true, confirmButtonText: '儲存'
+  }).then(function(r) { if (r.isConfirmed) { persist(); renderPF(); } });
+};
+
+/* ============================================================
+   CAROUSEL MANAGER
+============================================================ */
+window.manageCarousel = function() {
+  var imgs = D.carouselImages;
+  var thumbs = '';
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i];
+    thumbs += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<img src="' + src + '" style="width:80px;height:45px;object-fit:cover;border:1px solid var(--border-g)">' +
+      '<div style="flex:1;font-size:.72rem;color:var(--t3);word-break:break-all">' + (src.length > 55 ? src.slice(0,55)+'…' : src) + '</div>' +
+      '<button onclick="dlCar(' + i + ')" style="background:var(--red);border:none;color:#fff;padding:4px 10px;cursor:pointer;font-size:.72rem">刪除</button></div>';
+  }
+  window.dlCar = function(i) {
+    if (D.carouselImages.length <= 1) return;
+    D.carouselImages.splice(i, 1); persist(); carIdx = 0; clearInterval(carTimer); initCarousel();
+    Swal.close(); setTimeout(window.manageCarousel, 200);
+  };
+  Swal.fire({
+    title: '🖼 管理輪播圖片', width: 620,
+    html: '<div style="max-height:240px;overflow-y:auto;text-align:left">' + thumbs + '</div>' +
+          '<hr style="border-color:var(--border);margin:12px 0">' +
+          '<p style="color:var(--gold);font-size:.78rem;text-align:left;margin-bottom:8px">新增圖片</p>' +
+          '<input id="curl" class="swal2-input" placeholder="https://example.com/photo.jpg" style="margin-bottom:8px">' +
+          '<input type="file" id="cfile" accept="image/*" class="swal2-file">',
+    showCancelButton: true, confirmButtonText: '新增', cancelButtonText: '關閉',
+    preConfirm: function() {
+      var urlV = document.getElementById('curl').value.trim();
+      var file = document.getElementById('cfile').files[0];
+      if (urlV) return Promise.resolve(urlV);
+      if (file) {
+        return new Promise(function(res) {
+          var rdr = new FileReader();
+          rdr.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+              var cv = document.createElement('canvas');
+              var mW = 1200, sc = Math.min(1, mW / img.width);
+              cv.width = img.width * sc; cv.height = img.height * sc;
+              cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+              res(cv.toDataURL('image/jpeg', 0.82));
+            };
+            img.src = e.target.result;
+          };
+          rdr.readAsDataURL(file);
+        });
+      }
+      Swal.showValidationMessage('請輸入網址或選擇圖片'); return false;
+    }
+  }).then(function(r) {
+    if (r.isConfirmed && r.value) {
+      D.carouselImages.push(r.value); persist(); carIdx = 0; clearInterval(carTimer); initCarousel();
+      Swal.fire({ title:'已新增！', timer:900, showConfirmButton:false, icon:'success' });
+    }
+  });
+};
+
+/* ============================================================
+   LOGO
+============================================================ */
+window.changeLogo = function() {
+  Swal.fire({
+    title: '🔄 更換 Logo',
+    html: '<input type="file" id="lf" class="swal2-file" accept="image/*"><p style="margin-top:8px;font-size:.78rem;color:var(--t3)">建議方形圖，系統自動壓縮。</p>',
+    confirmButtonText: '上傳', showCancelButton: true,
+    preConfirm: function() {
+      var file = document.getElementById('lf').files[0]; if (!file) return null;
+      return new Promise(function(res) {
+        var rdr = new FileReader();
+        rdr.onload = function(e) {
+          var img = new Image();
+          img.onload = function() {
+            var cv = document.createElement('canvas'); cv.width = cv.height = 200;
+            var s = Math.min(img.width, img.height);
+            cv.getContext('2d').drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 200, 200);
+            res(cv.toDataURL('image/jpeg', 0.78));
+          };
+          img.src = e.target.result;
+        };
+        rdr.readAsDataURL(file);
+      });
+    }
+  }).then(function(r) { if (r.value) { D.logoData = r.value; saveChanges(false); } });
+};
+
+/* ============================================================
+   THEME EDITOR
+============================================================ */
+window.openThemeEditor = function() {
+  var t = D.theme || DEF.theme;
+  Swal.fire({
+    title: '🎨 外觀設定', width: 620,
+    html: '<div style="text-align:left;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+      '<div><label style="color:var(--gold);font-size:.72rem">背景色（深）</label><input type="color" id="t-bg" value="' + t.bgColor + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">背景色（次）</label><input type="color" id="t-bg2" value="' + t.bg2Color + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">強調色（金）</label><input type="color" id="t-gold" value="' + t.goldColor + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">主要文字色</label><input type="color" id="t-t1" value="' + t.t1Color + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">次要文字色</label><input type="color" id="t-t2" value="' + t.t2Color + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">淡化文字色</label><input type="color" id="t-t3" value="' + t.t3Color + '" style="width:100%;height:36px;cursor:pointer;background:none;border:1px solid var(--border-g)"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">SCROLL 顏色</label><input id="t-sc" class="swal2-input" value="' + t.scrollColor + '" style="margin:4px 0;height:34px"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">SCROLL 大小</label><input id="t-ss" class="swal2-input" value="' + t.scrollSize + '" style="margin:4px 0;height:34px"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">SCROLL 字體</label><input id="t-sf" class="swal2-input" value="' + t.scrollFont + '" style="margin:4px 0;height:34px"></div>' +
+      '<div><label style="color:var(--gold);font-size:.72rem">標籤文字大小</label><input id="t-lbl" class="swal2-input" value="' + (t.labelSize||'0.92rem') + '" style="margin:4px 0;height:34px"></div>' +
+      '<div style="grid-column:1/-1"><label style="color:var(--gold);font-size:.72rem">版權文字模板（{YEAR} 自動年度）</label><input id="t-cpy" class="swal2-input" value="' + (D.footerCopyTpl||DEF.footerCopyTpl) + '" style="margin:4px 0;height:34px"></div>' +
+      '</div>',
+    showCancelButton: true, confirmButtonText: '套用', cancelButtonText: '取消',
+    preConfirm: function() {
+      D.theme.bgColor   = document.getElementById('t-bg').value;
+      D.theme.bg2Color  = document.getElementById('t-bg2').value;
+      D.theme.goldColor = document.getElementById('t-gold').value;
+      D.theme.t1Color   = document.getElementById('t-t1').value;
+      D.theme.t2Color   = document.getElementById('t-t2').value;
+      D.theme.t3Color   = document.getElementById('t-t3').value;
+      D.theme.scrollColor = document.getElementById('t-sc').value;
+      D.theme.scrollSize  = document.getElementById('t-ss').value;
+      D.theme.scrollFont  = document.getElementById('t-sf').value;
+      D.theme.labelSize   = document.getElementById('t-lbl').value;
+      D.footerCopyTpl = document.getElementById('t-cpy').value;
+      return true;
+    }
+  }).then(function(r) {
+    if (r.isConfirmed) { applyTheme(); persist(); renderFooterCopy(); Swal.fire({ title:'外觀已更新！', timer:1000, showConfirmButton:false, icon:'success' }); }
+  });
+};
+
+/* ============================================================
+   HERO EDITOR (super_admin)
+============================================================ */
+window.openHeroEditor = function() {
+  var t = D.theme || DEF.theme;
+  Swal.fire({
+    title: '✏ 首頁文字設定', width: 560,
+    html: '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin-bottom:4px">英文大標文字</label>' +
+          '<input id="he-en" class="swal2-input" value="' + (D.heroEnTitle||'') + '">' +
+          '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin:8px 0 4px">英文字體名稱（Google Fonts）</label>' +
+          '<input id="he-ef" class="swal2-input" value="' + (t.heroEnFont||'Iansui') + '">' +
+          '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin:8px 0 4px">英文字體大小（如 7.5rem）</label>' +
+          '<input id="he-es" class="swal2-input" value="' + (t.heroEnSize||'7.5rem') + '">' +
+          '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin:8px 0 4px">中文副標文字</label>' +
+          '<input id="he-zh" class="swal2-input" value="' + (D.heroZhTitle||'') + '">' +
+          '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin:8px 0 4px">中文副標大小</label>' +
+          '<input id="he-zs" class="swal2-input" value="' + (t.heroZhSize||'2.6rem') + '">' +
+          '<label style="color:var(--gold);font-size:.72rem;display:block;text-align:left;margin:8px 0 4px">副標說明文字</label>' +
+          '<textarea id="he-sub" class="swal2-textarea">' + (D.heroDesc||'') + '</textarea>',
+    showCancelButton: true, confirmButtonText: '儲存',
+    preConfirm: function() {
+      return {
+        en: document.getElementById('he-en').value,
+        ef: document.getElementById('he-ef').value,
+        es: document.getElementById('he-es').value,
+        zh: document.getElementById('he-zh').value,
+        zs: document.getElementById('he-zs').value,
+        sub: document.getElementById('he-sub').value
+      };
+    }
+  }).then(function(r) {
+    if (r.isConfirmed) {
+      D.heroEnTitle = r.value.en; D.heroZhTitle = r.value.zh; D.heroDesc = r.value.sub;
+      D.theme.heroEnFont = r.value.ef; D.theme.heroEnSize = r.value.es; D.theme.heroZhSize = r.value.zs;
+      applyTheme(); persist(); updateDOM();
+      Swal.fire({ title:'首頁已更新！', timer:1000, showConfirmButton:false, icon:'success' });
+    }
+  });
+};
+
+/* ============================================================
+   ADMIN UI
+============================================================ */
+function updateAdminUI() {
+  var bar = document.getElementById('admin-bar');
+  var lb  = document.getElementById('float-login-btn');
+  var le  = document.getElementById('label-editor');
+  var avatarDiv = document.getElementById('admin-avatar');
+  var avatarImg = document.getElementById('admin-avatar-img');
+  
+  if (CU) {
+    bar.classList.add('show'); lb.style.display = 'none';
+    
+    // 角色徽章樣式
+    var roleBadge = '';
+    if (CU.role === 'super_admin') {
+      roleBadge = '<span style="background:linear-gradient(135deg,#C9963A,#E4B86A);color:#fff;font-size:.62rem;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600">超級執行長</span>';
+    } else if (CU.role === 'ops_admin') {
+      roleBadge = '<span style="background:linear-gradient(135deg,#4A90E2,#67B5F5);color:#fff;font-size:.62rem;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600">營運長</span>';
+    } else {
+      roleBadge = '<span style="background:linear-gradient(135deg,#9A948C,#B8B2A8);color:#fff;font-size:.62rem;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600">優秀人員</span>';
+    }
+    
+    // 顯示帳號，靠近大頭貼
+    document.getElementById('admin-info').innerHTML = '<strong>' + CU.username + '</strong>' + roleBadge;
+    
+    // 右邊顯示大頭貼
+    if (CU.avatar && avatarDiv && avatarImg) {
+      avatarDiv.style.display = 'block';
+      avatarImg.src = CU.avatar;
+    } else if (avatarDiv) {
+      avatarDiv.style.display = 'none';
+    }
+    
+    // 按鈕權限控制
+    var btns = document.querySelectorAll('.admin-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var req = btns[i].getAttribute('data-role') || 'editor';
+      var ok = false;
+      
+      if (req === 'editor') {
+        ok = true; // 所有角色都可以使用 editor 級別的按鈕
+      } else if (req === 'ops_admin') {
+        ok = (CU.role === 'super_admin' || CU.role === 'ops_admin');
+      } else if (req === 'super_admin') {
+        ok = (CU.role === 'super_admin');
+      }
+      
+      if (ok) btns[i].classList.add('show'); 
+      else btns[i].classList.remove('show');
+    }
+    
+    if (le) le.classList.add('show');
+  } else {
+    bar.classList.remove('show'); lb.style.display = 'block';
+    if (avatarDiv) avatarDiv.style.display = 'none';
+    var btns = document.querySelectorAll('.admin-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('show');
+    if (le) le.classList.remove('show');
+  }
+}
+
+window.showLoginModal = function() {
+  Swal.fire({
+    title: '後台登入',
+    html: '<input id="su" class="swal2-input" placeholder="帳號" autocomplete="username"><input id="sp" type="password" class="swal2-input" placeholder="密碼" autocomplete="current-password">',
+    confirmButtonText: '登入', showCancelButton: true, cancelButtonText: '取消',
+    didOpen: function() {
+      // 監聽 ENTER 鍵
+      var passwordInput = document.getElementById('sp');
+      var usernameInput = document.getElementById('su');
+      
+      var handleEnter = function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          Swal.clickConfirm();
+        }
+      };
+      
+      usernameInput.addEventListener('keypress', handleEnter);
+      passwordInput.addEventListener('keypress', handleEnter);
+      
+      // 自動 focus 到帳號欄位
+      usernameInput.focus();
+    },
+    preConfirm: function() { return { u: document.getElementById('su').value, p: document.getElementById('sp').value }; }
+  }).then(function(r) {
+    if (r.isConfirmed) {
+      var found = null;
+      for (var i = 0; i < D.users.length; i++) {
+        if (D.users[i].username === r.value.u && D.users[i].password === r.value.p) { found = D.users[i]; break; }
+      }
+      if (found) {
+        CU = found;
+        var ui = -1; for (var i = 0; i < D.users.length; i++) if (D.users[i].username === CU.username) { ui = i; break; }
+        if (ui >= 0) { D.users[ui].online = true; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
+        sessionStorage.setItem('mk5cu', JSON.stringify(CU)); persist(); updateDOM();
+        startAutoLogout(); // 啟動自動登出計時器
+        Swal.fire({ title: '歡迎，' + found.name + '！', timer: 1200, showConfirmButton: false, icon: 'success' });
+      } else Swal.fire({ title: '帳號或密碼錯誤', icon: 'error' });
+    }
+  });
+};
+
+/* ============================================================
+   AUTO LOGOUT
+============================================================ */
+function startAutoLogout() {
+  clearAutoLogout(); // 清除舊的計時器
+  
+  if (!CU) return; // 未登入不需要計時
+  
+  var minutes = (D.backendSettings && D.backendSettings.autoLogoutMinutes) || 5;
+  var milliseconds = minutes * 60 * 1000;
+  
+  autoLogoutTimer = setTimeout(function() {
+    if (CU) {
+      adminLogout();
+      Swal.fire({
+        title: '已自動登出',
+        text: '閒置 ' + minutes + ' 分鐘，已自動登出',
+        icon: 'info',
+        timer: 3000
+      });
+    }
+  }, milliseconds);
+}
+
+function clearAutoLogout() {
+  if (autoLogoutTimer) {
+    clearTimeout(autoLogoutTimer);
+    autoLogoutTimer = null;
+  }
+}
+
+function resetAutoLogout() {
+  if (CU) {
+    startAutoLogout(); // 重新開始計時
+  }
+}
+
+/* ============================================================
+   LOGOUT
+============================================================ */
+window.adminLogout = function() {
+  clearAutoLogout(); // 登出時清除計時器
+  saveChanges(false);
+  if (CU) {
+    var ui = -1; for (var i = 0; i < D.users.length; i++) if (D.users[i].username === CU.username) { ui = i; break; }
+    if (ui >= 0) { D.users[ui].online = false; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
+  }
+  CU = null; sessionStorage.removeItem('mk5cu'); persist(); updateDOM();
+  Swal.fire({ title: '已登出', timer: 900, showConfirmButton: false });
+};
+
+/* ============================================================
+   BACKEND SETTINGS (super_admin only)
+============================================================ */
+window.openBackendSettings = function() {
+  if (!CU || CU.role !== 'super_admin') {
+    Swal.fire({title:'無權限',text:'僅超級執行長可使用後台設定',icon:'error'});
+    return;
+  }
+  
+  var t = D.theme || {};
+  var bs = D.backendSettings || {};
+  
+  Swal.fire({
+    title: '⚙️ 後台設定（超級執行長專屬）',
+    width: 750,
+    html: '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:500px;overflow-y:auto;padding:10px">' +
+      '<h4 style="color:var(--gold);margin-top:0;font-size:1rem">⏱️ 自動登出設定</h4>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">閒置幾分鐘後自動登出：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>' +
+      '<small style="color:var(--t3);display:block;margin-top:4px;font-size:.75rem">提示：預設為 5 分鐘，範圍 1-120 分鐘</small>' +
+      '<h4 style="color:var(--gold);margin-top:24px;font-size:1rem">🌟 光暈設定</h4>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'rgba(201,150,58,0.85)') + '" placeholder="rgba(201,150,58,0.85)"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">亮度（0-1）：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.05" min="0" max="1" value="' + (t.rippleOpacity||'0.85') + '" placeholder="0.85"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'86px') + '" placeholder="86px"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'3px') + '" placeholder="3px"></label>' +
+      '<h4 style="color:var(--gold);margin-top:24px;font-size:1rem">🔢 流程數字亮度</h4>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">預設亮度（0-1）：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.01" min="0" max="1" value="' + (t.procNumOpacity||'0.18') + '"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Hover 亮度（0-1）：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.01" min="0" max="1" value="' + (t.procNumHoverOpacity||'1.0') + '"></label>' +
+      '<h4 style="color:var(--gold);margin-top:24px;font-size:1rem">©️ 版權模板</h4>' +
+      '<input id="bs-copyright" class="swal2-input" value="' + (bs.copyrightTemplate||'© {YEAR} 馬克伍號影像工作室。保留所有權利。') + '" placeholder="© {YEAR} 公司名稱">' +
+      '<small style="color:var(--t3);display:block;margin-top:4px;font-size:.75rem">提示：{YEAR} 會自動替換為當前年份</small>' +
+      '<h4 style="color:var(--gold);margin-top:24px;font-size:1rem">📧 發送訊息 Email</h4>' +
+      '<input id="bs-send-email" class="swal2-input" value="' + (bs.sendMessageEmail||'') + '" placeholder="留空使用 contactEmail">' +
+      '<h4 style="color:var(--gold);margin-top:24px;font-size:1rem">🏠 首頁大標設定</h4>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<select id="bs-hero-en-font" class="swal2-input" style="margin-top:4px">' +
+        '<option value="Iansui"' + (t.heroEnFont==='Iansui'?' selected':'') + '>Iansui</option>' +
+        '<option value="Bebas Neue"' + (t.heroEnFont==='Bebas Neue'?' selected':'') + '>Bebas Neue</option>' +
+        '<option value="Google Sans Flex"' + (t.heroEnFont==='Google Sans Flex'?' selected':'') + '>Google Sans Flex</option>' +
+      '</select></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'7.5rem') + '" placeholder="7.5rem"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'2.6rem') + '" placeholder="2.6rem"></label>' +
+      '</div>',
+    confirmButtonText: '💾 儲存設定',
+    showCancelButton: true,
+    cancelButtonText: '取消',
+    didOpen: function() {
+      // 光暈即時預覽
+      var previewRipple = function() {
+        var color = document.getElementById('bs-ripple-color').value;
+        var opacity = document.getElementById('bs-ripple-opacity').value;
+        var size = document.getElementById('bs-ripple-size').value;
+        var width = document.getElementById('bs-ripple-width').value;
+        
+        // 動態更新 CSS Variables
+        var r = document.documentElement.style;
+        
+        // 處理顏色和亮度
+        var rippleColorFinal = color;
+        if (color.indexOf('rgba') === 0) {
+          var rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (rgbMatch) {
+            rippleColorFinal = 'rgba(' + rgbMatch[1] + ',' + rgbMatch[2] + ',' + rgbMatch[3] + ',' + opacity + ')';
+          }
+        }
+        
+        r.setProperty('--ripple-color', rippleColorFinal);
+        r.setProperty('--ripple-size', size);
+        r.setProperty('--ripple-width', width);
+      };
+      
+      // 監聽所有光暈設定輸入框
+      document.getElementById('bs-ripple-color').addEventListener('input', previewRipple);
+      document.getElementById('bs-ripple-opacity').addEventListener('input', previewRipple);
+      document.getElementById('bs-ripple-size').addEventListener('input', previewRipple);
+      document.getElementById('bs-ripple-width').addEventListener('input', previewRipple);
+    },
+    preConfirm: function() {
+      return {
+        autoLogoutMinutes: parseInt(document.getElementById('bs-auto-logout').value) || 5,
+        rippleColor: document.getElementById('bs-ripple-color').value,
+        rippleOpacity: document.getElementById('bs-ripple-opacity').value,
+        rippleSize: document.getElementById('bs-ripple-size').value,
+        rippleWidth: document.getElementById('bs-ripple-width').value,
+        procNumOpacity: document.getElementById('bs-proc-dim').value,
+        procNumHoverOpacity: document.getElementById('bs-proc-hover').value,
+        copyrightTemplate: document.getElementById('bs-copyright').value,
+        sendMessageEmail: document.getElementById('bs-send-email').value,
+        heroEnFont: document.getElementById('bs-hero-en-font').value,
+        heroEnSize: document.getElementById('bs-hero-en-size').value,
+        heroZhSize: document.getElementById('bs-hero-zh-size').value
+      };
+    }
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      var v = result.value;
+      
+      // 更新 theme
+      if (!D.theme) D.theme = {};
+      D.theme.rippleColor = v.rippleColor;
+      D.theme.rippleOpacity = v.rippleOpacity;
+      D.theme.rippleSize = v.rippleSize;
+      D.theme.rippleWidth = v.rippleWidth;
+      D.theme.procNumOpacity = v.procNumOpacity;
+      D.theme.procNumHoverOpacity = v.procNumHoverOpacity;
+      D.theme.heroEnFont = v.heroEnFont;
+      D.theme.heroEnSize = v.heroEnSize;
+      D.theme.heroZhSize = v.heroZhSize;
+      
+      // 更新 backendSettings
+      if (!D.backendSettings) D.backendSettings = {};
+      D.backendSettings.autoLogoutMinutes = v.autoLogoutMinutes;
+      D.backendSettings.copyrightTemplate = v.copyrightTemplate;
+      D.backendSettings.sendMessageEmail = v.sendMessageEmail;
+      
+      logEdit(['theme','backendSettings']);
+      persist();
+      applyTheme();
+      
+      // 重新啟動自動登出計時器（使用新的時間設定）
+      if (CU) {
+        startAutoLogout();
+      }
+      renderFooterCopy();
+      
+      Swal.fire({title:'✅ 設定已儲存！',text:'部分變更需重新整理頁面才能生效',timer:2000,showConfirmButton:false,icon:'success'});
+    }
+  });
+};
+
+/* ============================================================
+   USER MANAGER
+============================================================ */
+window.showUsers = function() {
+  function uLH() {
+    var html = '';
+    var roleMap = {
+      'super_admin':'超級執行長',
+      'ops_admin':'營運長',
+      'editor':'一般編輯'
+    };
+    
+    for (var i = 0; i < D.users.length; i++) {
+      var u = D.users[i];
+      var roleName = roleMap[u.role] || '一般編輯';
+      var roleClass = u.role || 'editor';
+      
+      // 預設大頭貼（灰色圓圈）
+      var avatarSrc = u.avatar || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MCA1MCI+PGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMjAiIGZpbGw9IiM5QTk0OEMiLz48L3N2Zz4=';
+      
+      html += '<div class="user-card">';
+      html += '<div class="user-avatar-wrap">';
+      html += '<img src="' + avatarSrc + '" class="user-avatar-large' + (u.online?' online':'') + '" alt="' + u.name + '">';
+      html += '<button class="upload-avatar-btn" onclick="uploadAvatar(' + i + ')"><i class="fa-solid fa-camera"></i></button>';
+      html += '</div>';
+      html += '<div class="user-info">';
+      html += '<div class="user-name">';
+      html += u.name;
+      html += '<span class="user-role-badge ' + roleClass + '">' + roleName + '</span>';
+      if (u.online) html += '<span class="user-online-status">● 在線</span>';
+      html += '</div>';
+      html += '<div class="user-meta">' + u.username + ' · 最後登入：' + (u.lastSeen||'從未') + '</div>';
+      html += '</div>';
+      html += '<div class="user-actions">';
+      html += '<button class="user-action-btn" onclick="editUserAt(' + i + ')">編輯</button>';
+      if (u.role !== 'super_admin') {
+        html += '<button class="user-action-btn delete" onclick="delUserAt(' + i + ')">刪除</button>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+    return html;
+  }
+
+  var logRows = '';
+  var logs = D.editLog || [];
+  for (var i = 0; i < Math.min(logs.length, 15); i++) {
+    var l = logs[i];
+    logRows += '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:.72rem;color:var(--t3);display:flex;justify-content:space-between;align-items:center">' +
+      '<div><span style="color:var(--gold)">' + l.user + '</span> · ' + l.date + '<br><span>' + (l.keys||[]).slice(0,4).join(', ') + ((l.keys||[]).length>4?'…':'') + '</span></div>' +
+      (l.snapshot ? '<button onclick="restoreSnap(' + i + ')" style="background:transparent;border:1px solid var(--border-g);color:var(--t2);padding:2px 8px;cursor:pointer;font-size:.7rem;flex-shrink:0">還原</button>' : '') +
+      '</div>';
+  }
+  if (!logRows) logRows = '<div style="color:var(--t3);font-size:.78rem;padding:8px 0">尚無紀錄</div>';
+
+  window.delUserAt = function(i) { D.users.splice(i, 1); persist(); document.getElementById('ulistw').innerHTML = uLH(); };
+  window.restoreSnap = function(li) {
+    Swal.fire({ title:'確定還原？', text:'將還原至此版本', icon:'warning', showCancelButton:true, confirmButtonText:'確定還原', cancelButtonText:'取消' }).then(function(r2) {
+      if (r2.isConfirmed) {
+        try {
+          var snap = JSON.parse(D.editLog[li].snapshot);
+          var savedLog = D.editLog, savedUsers = D.users;
+          D = snap; D.editLog = savedLog; D.users = savedUsers;
+          persist(); applyTheme(); updateDOM();
+          Swal.fire({ title:'已還原！', timer:1200, showConfirmButton:false, icon:'success' });
+        } catch(e) { Swal.fire({ title:'還原失敗', icon:'error' }); }
+      }
+    });
+  };
+  
+  /* 大頭貼上傳函數 */
+  window.uploadAvatar = function(userIdx) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*'; // 支援所有圖片格式
+    input.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      
+      // 檢查是否為圖片
+      if (!file.type.startsWith('image/')) {
+        Swal.fire({title:'格式錯誤',text:'請選擇圖片檔案',icon:'error'});
+        return;
+      }
+      
+      // 放寬檔案大小限制到 5MB
+      if (file.size > 5000000) {
+        Swal.fire({title:'檔案過大',text:'請選擇小於 5MB 的圖片',icon:'error'});
+        return;
+      }
+      
+      var reader = new FileReader();
+      reader.onload = function(evt) {
+        var img = new Image();
+        img.onload = function() {
+          // 創建 canvas 調整為 80x80
+          var canvas = document.createElement('canvas');
+          canvas.width = 80;
+          canvas.height = 80;
+          var ctx = canvas.getContext('2d');
+          
+          // 計算裁切（保持中心）
+          var size = Math.min(img.width, img.height);
+          var x = (img.width - size) / 2;
+          var y = (img.height - size) / 2;
+          
+          ctx.drawImage(img, x, y, size, size, 0, 0, 80, 80);
+          
+          // 轉為 JPEG base64（高品質壓縮）
+          var avatarData = canvas.toDataURL('image/jpeg', 0.9);
+          D.users[userIdx].avatar = avatarData;
+          
+          // 如果是當前用戶，也更新 CU
+          if (CU && CU.username === D.users[userIdx].username) {
+            CU.avatar = avatarData;
+            sessionStorage.setItem('mk5cu', JSON.stringify(CU));
+            updateAdminUI(); // 更新後台顯示
+          }
+          
+          logEdit(['users']);
+          persist();
+          document.getElementById('ulistw').innerHTML = uLH();
+          Swal.fire({title:'✅ 大頭貼已上傳！',timer:1200,showConfirmButton:false,icon:'success'});
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+  
+  window.editUserAt = function(i) {
+    var u = D.users[i];
+    var avatarSrc = u.avatar || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MCA1MCI+PGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMjAiIGZpbGw9IiM5QTk0OEMiLz48L3N2Zz4=';
+    
+    Swal.fire({
+      title: '編輯帳號',
+      html: '<div style="text-align:center;margin-bottom:16px">' +
+            '<div style="position:relative;display:inline-block">' +
+            '<img id="edit-avatar-preview" src="' + avatarSrc + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--gold)">' +
+            '<button onclick="editUploadAvatar(' + i + ')" style="position:absolute;bottom:-5px;right:-5px;width:28px;height:28px;border-radius:50%;background:var(--gold);border:2px solid var(--bg);color:var(--bg);cursor:pointer;font-size:.75rem"><i class="fa-solid fa-camera"></i></button>' +
+            '</div></div>' +
+            '<input id="eu-nm" class="swal2-input" value="' + u.name + '" placeholder="顯示名稱">' +
+            '<input id="eu-un" class="swal2-input" value="' + u.username + '" placeholder="帳號">' +
+            '<input id="eu-pw" type="password" class="swal2-input" placeholder="新密碼（留空不變）">' +
+            '<select id="eu-ro" class="swal2-input">' +
+              '<option value="editor"' + (u.role==='editor'?' selected':'') + '>一般編輯</option>' +
+              '<option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option>' +
+              '<option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option>' +
+            '</select>',
+      showCancelButton: true, confirmButtonText: '儲存',
+      preConfirm: function() {
+        var nm = document.getElementById('eu-nm').value.trim();
+        var un = document.getElementById('eu-un').value.trim();
+        var pw = document.getElementById('eu-pw').value;
+        if (!nm || !un) { Swal.showValidationMessage('名稱和帳號必填'); return false; }
+        return { name:nm, username:un, password:pw||u.password, role:document.getElementById('eu-ro').value };
+      }
+    }).then(function(r) {
+      if (r.isConfirmed) {
+        D.users[i] = Object.assign({}, D.users[i], r.value);
+        if (CU && CU.username === u.username) { CU = Object.assign({}, CU, r.value); sessionStorage.setItem('mk5cu', JSON.stringify(CU)); }
+        persist(); showUsers();
+      }
+    });
+    
+    // 編輯時的大頭貼上傳函數
+    window.editUploadAvatar = function(userIdx) {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+        if (file.size > 5000000) {
+          Swal.fire({title:'檔案過大',text:'請選擇小於 5MB 的圖片',icon:'error'});
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          var img = new Image();
+          img.onload = function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 80;
+            canvas.height = 80;
+            var ctx = canvas.getContext('2d');
+            var size = Math.min(img.width, img.height);
+            var x = (img.width - size) / 2;
+            var y = (img.height - size) / 2;
+            ctx.drawImage(img, x, y, size, size, 0, 0, 80, 80);
+            var avatarData = canvas.toDataURL('image/jpeg', 0.9);
+            D.users[userIdx].avatar = avatarData;
+            document.getElementById('edit-avatar-preview').src = avatarData;
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    };
+  };
+
+  Swal.fire({
+    title: '👥 帳號管理', width: 560,
+    html: '<div id="ulistw" style="text-align:left;max-height:220px;overflow-y:auto">' + uLH() + '</div>' +
+          '<button onclick="addUserDlg()" style="margin-top:12px;background:var(--gold);border:none;color:var(--bg);padding:8px 18px;cursor:pointer;font-size:.82rem;font-weight:700">＋ 新增帳號</button>' +
+          '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.75rem;letter-spacing:.1em">編輯紀錄</strong>' +
+          '<div style="max-height:160px;overflow-y:auto;margin-top:6px">' + logRows + '</div></div>',
+    confirmButtonText: '關閉', showCancelButton: false,
+    didOpen: function() {
+      window.addUserDlg = function() {
+        Swal.fire({
+          title: '新增帳號',
+          html: '<input id="nu-nm" class="swal2-input" placeholder="顯示名稱">' +
+                '<input id="nu-un" class="swal2-input" placeholder="帳號（英文）">' +
+                '<input id="nu-pw" type="password" class="swal2-input" placeholder="密碼">' +
+                '<select id="nu-ro" class="swal2-input">' +
+                  '<option value="editor">一般編輯</option>' +
+                  '<option value="ops_admin">營運長</option>' +
+                  '<option value="super_admin">超級執行長</option>' +
+                '</select>',
+          showCancelButton: true, confirmButtonText: '新增',
+          preConfirm: function() {
+            var nm = document.getElementById('nu-nm').value.trim();
+            var un = document.getElementById('nu-un').value.trim();
+            var pw = document.getElementById('nu-pw').value;
+            if (!nm || !un || !pw) { Swal.showValidationMessage('請填寫所有欄位'); return false; }
+            for (var i = 0; i < D.users.length; i++) if (D.users[i].username === un) { Swal.showValidationMessage('帳號已存在'); return false; }
+            return { name:nm, username:un, password:pw, role:document.getElementById('nu-ro').value, online:false, lastSeen:'' };
+          }
+        }).then(function(r2) { if (r2.isConfirmed) { D.users.push(r2.value); persist(); showUsers(); } });
+      };
+    }
+  });
+};
+
+window.editMyProfile = function() {
+  var i = -1;
+  for (var j = 0; j < D.users.length; j++) if (D.users[j].username === (CU && CU.username)) { i = j; break; }
+  if (i >= 0) editUserAt(i);
+};
+
+/* ============================================================
+   CLOCK & WEATHER
+============================================================ */
+function initClock() {
+  updateClock();
+  setInterval(updateClock, 1000);
+}
+
+function updateClock() {
+  var now = new Date();
+  var y = now.getFullYear();
+  var m = String(now.getMonth() + 1).padStart(2, '0');
+  var d = String(now.getDate()).padStart(2, '0');
+  var hh = String(now.getHours()).padStart(2, '0');
+  var mm = String(now.getMinutes()).padStart(2, '0');
+  var ss = String(now.getSeconds()).padStart(2, '0');
+  var str = y + '/' + m + '/' + d + ' ' + hh + ':' + mm + ':' + ss;
+  var el = document.getElementById('clock-display');
+  if (el) el.textContent = str;
+}
+
+function initWeather() {
+  var lat = 25.04, lon = 121.56;
+  var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current_weather=true';
+  fetch(url)
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.current_weather) {
+        var wc = data.current_weather.weathercode;
+        var icon = getWeatherIcon(wc);
+        var label = getWeatherLabel(wc);
+        var el = document.getElementById('weather-icon');
+        if (el) el.textContent = icon + ' ' + label;
+      }
+    })
+    .catch(function(e) { 
+      console.error('Weather API error:', e);
+      var el = document.getElementById('weather-icon');
+      if (el) el.textContent = '☀️ 晴天';
+    });
+}
+
+function getWeatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code >= 1 && code <= 3) return '☁️';
+  if (code >= 51 && code <= 67) return '☂️';
+  if (code >= 80 && code <= 99) return '⚡';
+  return '☀️';
+}
+
+function getWeatherLabel(code) {
+  if (code === 0) return '晴天';
+  if (code >= 1 && code <= 3) return '陰天';
+  if (code >= 51 && code <= 67) return '降雨';
+  if (code >= 80 && code <= 99) return '打雷';
+  return '晴天';
+}
+
+/* ============================================================
+   ANALYTICS
+============================================================ */
+function trackVisit() {
+  if (!D.analytics) D.analytics = { pageViews:0, byDate:{}, byDevice:{}, bySource:{} };
+  D.analytics.pageViews = (D.analytics.pageViews || 0) + 1;
+  var today = new Date().toLocaleDateString('zh-TW');
+  D.analytics.byDate[today] = (D.analytics.byDate[today] || 0) + 1;
+  var keys = Object.keys(D.analytics.byDate);
+  if (keys.length > 30) delete D.analytics.byDate[keys[0]];
+  var dev = /Tablet|iPad/i.test(navigator.userAgent) ? '平板' : /Mobi|Android/i.test(navigator.userAgent) ? '手機' : '桌上型電腦';
+  D.analytics.byDevice[dev] = (D.analytics.byDevice[dev] || 0) + 1;
+  var src = '直接輸入';
+  if (document.referrer) {
+    if (/google|bing|yahoo/i.test(document.referrer)) src = '搜尋引擎';
+    else if (/facebook|instagram|line|youtube/i.test(document.referrer)) src = '社群媒體';
+    else src = '外部連結';
+  }
+  D.analytics.bySource[src] = (D.analytics.bySource[src] || 0) + 1;
+  
+  // 地區追蹤（使用 ipapi.co）
+  if (!D.analytics.byLocation) D.analytics.byLocation = {};
+  fetch('https://ipapi.co/json/')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data && data.country_name) {
+        var loc = data.country_name + (data.city ? ' / ' + data.city : '');
+        D.analytics.byLocation[loc] = (D.analytics.byLocation[loc] || 0) + 1;
+        persist();
+      }
+    })
+    .catch(function(e) { 
+      console.log('Location API unavailable:', e.message); 
+    });
+  
+  persist();
+}
+
+/* Excel 匯出函數 */
+window.exportAnalyticsExcel = function() {
+  if (typeof XLSX === 'undefined') {
+    Swal.fire({title:'功能未啟用',html:'Excel 匯出需要 SheetJS library<br>請確認網頁已載入相關資源',icon:'info'});
+    return;
+  }
+  
+  var a = D.analytics || {};
+  var wb = XLSX.utils.book_new();
+  
+  // 日期數據
+  var dateData = [['日期', '瀏覽次數']];
+  var dates = Object.keys(a.byDate || {}).sort();
+  for (var i = 0; i < dates.length; i++) {
+    dateData.push([dates[i], a.byDate[dates[i]]]);
+  }
+  var ws1 = XLSX.utils.aoa_to_sheet(dateData);
+  XLSX.utils.book_append_sheet(wb, ws1, '日期趨勢');
+  
+  // 裝置數據
+  var deviceData = [['裝置類型', '次數']];
+  var devices = Object.keys(a.byDevice || {});
+  for (var i = 0; i < devices.length; i++) {
+    deviceData.push([devices[i], a.byDevice[devices[i]]]);
+  }
+  var ws2 = XLSX.utils.aoa_to_sheet(deviceData);
+  XLSX.utils.book_append_sheet(wb, ws2, '裝置類型');
+  
+  // 流量來源
+  var sourceData = [['流量來源', '次數']];
+  var sources = Object.keys(a.bySource || {});
+  for (var i = 0; i < sources.length; i++) {
+    sourceData.push([sources[i], a.bySource[sources[i]]]);
+  }
+  var ws3 = XLSX.utils.aoa_to_sheet(sourceData);
+  XLSX.utils.book_append_sheet(wb, ws3, '流量來源');
+  
+  // 地區分布
+  if (a.byLocation) {
+    var locData = [['地區', '次數']];
+    var locs = Object.keys(a.byLocation);
+    for (var i = 0; i < locs.length; i++) {
+      locData.push([locs[i], a.byLocation[locs[i]]]);
+    }
+    var ws4 = XLSX.utils.aoa_to_sheet(locData);
+    XLSX.utils.book_append_sheet(wb, ws4, '地區分布');
+  }
+  
+  XLSX.writeFile(wb, 'analytics_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  Swal.fire({title:'✅ Excel 已匯出！',timer:1200,showConfirmButton:false,icon:'success'});
+};
+
+/* PDF 匯出函數 */
+window.exportAnalyticsPDF = function() {
+  if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+    Swal.fire({title:'功能未啟用',html:'PDF 匯出需要 jsPDF library<br>請確認網頁已載入相關資源',icon:'info'});
+    return;
+  }
+  
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF();
+  var a = D.analytics || {};
+  
+  // 標題
+  doc.setFontSize(16);
+  doc.text('瀏覽數據分析報告', 14, 20);
+  doc.setFontSize(10);
+  doc.text('匯出日期：' + new Date().toLocaleDateString('zh-TW'), 14, 28);
+  
+  // 日期趨勢表格
+  var dateRows = [];
+  var dates = Object.keys(a.byDate || {}).sort().slice(-30); // 最近30天
+  for (var i = 0; i < dates.length; i++) {
+    dateRows.push([dates[i], a.byDate[dates[i]]]);
+  }
+  
+  if (dateRows.length) {
+    doc.autoTable({
+      head: [['日期', '瀏覽次數']],
+      body: dateRows,
+      startY: 35,
+      theme: 'grid',
+      headStyles: {fillColor: [201, 150, 58]}
+    });
+  }
+  
+  // 裝置類型
+  var deviceRows = [];
+  var devices = Object.keys(a.byDevice || {});
+  for (var i = 0; i < devices.length; i++) {
+    deviceRows.push([devices[i], a.byDevice[devices[i]]]);
+  }
+  
+  if (deviceRows.length) {
+    doc.autoTable({
+      head: [['裝置類型', '次數']],
+      body: deviceRows,
+      startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 35,
+      theme: 'grid',
+      headStyles: {fillColor: [201, 150, 58]}
+    });
+  }
+  
+  // 流量來源
+  var sourceRows = [];
+  var sources = Object.keys(a.bySource || {});
+  for (var i = 0; i < sources.length; i++) {
+    sourceRows.push([sources[i], a.bySource[sources[i]]]);
+  }
+  
+  if (sourceRows.length) {
+    doc.autoTable({
+      head: [['流量來源', '次數']],
+      body: sourceRows,
+      startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 35,
+      theme: 'grid',
+      headStyles: {fillColor: [201, 150, 58]}
+    });
+  }
+  
+  doc.save('analytics_' + new Date().toISOString().slice(0, 10) + '.pdf');
+  Swal.fire({title:'✅ PDF 已匯出！',timer:1200,showConfirmButton:false,icon:'success'});
+};
+
+window.showAnalytics = function() {
+  var a = D.analytics || {};
+  var byDate = a.byDate || {};
+  var dk = Object.keys(byDate).slice(-7);
+  var mx = 1;
+  for (var i = 0; i < dk.length; i++) if (byDate[dk[i]] > mx) mx = byDate[dk[i]];
+
+  var dr = '';
+  if (dk.length) {
+    for (var i = 0; i < dk.length; i++) {
+      var v = byDate[dk[i]], w = Math.round(v / mx * 100);
+      dr += '<div class="anl-bar-row"><div class="anl-bar-label" style="width:90px">' + dk[i] + '</div><div class="anl-bar-track"><div class="anl-bar-fill" data-w="' + w + '%" style="width:0%"></div></div><div class="anl-bar-val">' + v + '</div></div>';
+    }
+  } else dr = '<p style="color:var(--t3);font-size:.78rem;padding:10px 0">尚無數據</p>';
+
+  function ms(title, obj) {
+    var entries = Object.keys(obj || {}), tot = 0;
+    for (var i = 0; i < entries.length; i++) tot += obj[entries[i]];
+    if (!tot) tot = 1;
+    var html = '<div style="margin-bottom:14px"><h4 style="font-size:.7rem;letter-spacing:.18em;color:var(--gold);margin-bottom:10px;font-family:var(--display)">' + title + '</h4>';
+    for (var i = 0; i < entries.length; i++) {
+      var k = entries[i], v = obj[k], w = Math.round(v / tot * 100);
+      html += '<div class="anl-bar-row"><div class="anl-bar-label">' + k + '</div><div class="anl-bar-track"><div class="anl-bar-fill" data-w="' + w + '%" style="width:0%"></div></div><div class="anl-bar-val">' + v + '</div></div>';
+    }
+    return html + '</div>';
+  }
+
+  var now = new Date(), thisMonth = 0;
+  var entries = Object.keys(byDate);
+  for (var i = 0; i < entries.length; i++) {
+    var parts = entries[i].split('/');
+    if (parseInt(parts[1]) === now.getMonth()+1 && parseInt(parts[0]) === now.getFullYear()) thisMonth += byDate[entries[i]];
+  }
+  var todayStr = dk.length ? byDate[dk[dk.length-1]] || 0 : 0;
+
+  Swal.fire({
+    title: '📊 瀏覽數據', width: 700,
+    html: '<div style="margin-bottom:16px;text-align:center">' +
+          '<button onclick="exportAnalytics(\'csv\')" style="background:var(--gold);color:var(--bg);border:none;padding:6px 14px;cursor:pointer;font-size:.8rem;margin-right:6px;border-radius:3px">📥 匯出 CSV</button>' +
+          '<button onclick="exportAnalytics(\'json\')" style="background:var(--bg3);color:var(--t1);border:1px solid var(--border);padding:6px 14px;cursor:pointer;font-size:.8rem;margin-right:6px;border-radius:3px">📥 匯出 JSON</button>' +
+          '<button onclick="exportAnalyticsExcel()" style="background:#10793F;color:#fff;border:none;padding:6px 14px;cursor:pointer;font-size:.8rem;margin-right:6px;border-radius:3px">📊 匯出 Excel</button>' +
+          '<button onclick="exportAnalyticsPDF()" style="background:#DC4C41;color:#fff;border:none;padding:6px 14px;cursor:pointer;font-size:.8rem;border-radius:3px">📄 匯出 PDF</button>' +
+          '</div>' +
+          '<div class="anl-grid">' +
+          '<div class="anl-stat"><div class="anl-stat-num">' + (a.pageViews||0) + '</div><div class="anl-stat-lbl">累積瀏覽</div></div>' +
+          '<div class="anl-stat"><div class="anl-stat-num">' + thisMonth + '</div><div class="anl-stat-lbl">本月瀏覽</div></div>' +
+          '<div class="anl-stat"><div class="anl-stat-num">' + todayStr + '</div><div class="anl-stat-lbl">今日瀏覽</div></div></div>' +
+          '<div style="margin-bottom:14px"><h4 style="font-size:.7rem;letter-spacing:.18em;color:var(--gold);margin-bottom:10px;font-family:var(--display)">近 7 日趨勢</h4>' + dr + '</div>' +
+          ms('裝置類型', a.byDevice) + ms('流量來源', a.bySource) +
+          (a.byLocation ? ms('地區分布', a.byLocation) : '') +
+          '<p style="font-size:.72rem;color:var(--t3);margin-top:4px">* 本機瀏覽器數據，建議同時使用 Google Analytics。</p>',
+    confirmButtonText: '關閉',
+    didOpen: function() {
+      setTimeout(function() {
+        var bars = document.querySelectorAll('.anl-bar-fill[data-w]');
+        for (var i = 0; i < bars.length; i++) bars[i].style.width = bars[i].getAttribute('data-w');
+      }, 80);
+    }
+  });
+};
+
+/* ============================================================
+   SCROLL REVEAL + HEADER
+============================================================ */
+function initReveal() {
+  var obs = new IntersectionObserver(function(entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) { entries[i].target.classList.add('in'); obs.unobserve(entries[i].target); }
+    }
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  var els = document.querySelectorAll('.reveal,.stagger');
+  for (var i = 0; i < els.length; i++) obs.observe(els[i]);
+}
+
+function initHeaderScroll() {
+  var hdr = document.getElementById('site-header'), lastY = 0, ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(function() {
+        var y = window.scrollY;
+        hdr.classList.toggle('scrolled', y > 60);
+        if (y > 200) { hdr.classList.toggle('hide', y > lastY + 10); if (y < lastY - 10) hdr.classList.remove('hide'); }
+        else hdr.classList.remove('hide');
+        lastY = y; ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
+
+/* ============================================================
+   SHARE
+============================================================ */
+window.shareNative = function() {
+  if (navigator.share) { navigator.share({ title: document.title, url: location.href }).catch(function() {}); }
+  else copyLink();
+};
+window.copyLink = function() {
+  navigator.clipboard.writeText(location.href).then(function() {
+    Swal.fire({ title: '連結已複製！', timer: 900, showConfirmButton: false, icon: 'success' });
+  }).catch(function() {
+    var ta = document.createElement('textarea');
+    ta.value = location.href; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    Swal.fire({ title: '連結已複製！', timer: 900, showConfirmButton: false, icon: 'success' });
+  });
+};
+
+/* ============================================================
+   MOBILE NAV
+============================================================ */
+window.openMobileNav = function() { document.getElementById('mobile-nav').classList.add('open'); };
+window.closeMobileNav = function() { document.getElementById('mobile-nav').classList.remove('open'); };
+</script>
+</body>
+</html>
