@@ -43,7 +43,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--serif);font-weight:3
 /* Intro overlay */
 #intro-overlay{position:fixed;inset:0;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #intro-canvas{position:absolute;inset:0;width:100%;height:100%}
-#intro-logo-el{position:absolute;width:var(--intro-logo-size,200px);height:var(--intro-logo-size,200px);border-radius:50%;object-fit:cover;border:2px solid transparent;opacity:0;transform:scale(1.06);z-index:3;filter:blur(6px)}
+#intro-logo-el{position:absolute;width:var(--intro-logo-size,300px);height:var(--intro-logo-size,300px);border-radius:50%;object-fit:cover;border:2px solid transparent;opacity:0;transform:scale(1.06);z-index:3;filter:blur(6px)}
 #intro-tagline{position:absolute;bottom:26%;font-family:var(--display);font-size:clamp(.75rem,1.5vw,1rem);letter-spacing:.45em;color:var(--gold);opacity:0;z-index:3}
 
 /* Share bar */
@@ -167,7 +167,8 @@ nav a:hover{color:var(--gold)}nav a:hover::after{width:100%}
 .pf-item{background:var(--bg2);display:block;position:relative;overflow:hidden;transition:transform .35s}
 .pf-item:not(.playing):hover{transform:scale(1.01);z-index:2}
 .pf-thumb-wrap{position:relative;padding-bottom:56.25%;overflow:hidden;background:var(--bg3);cursor:pointer}
-.pf-item-vertical .pf-thumb-wrap{padding-bottom:177.78%;max-width:400px;margin:0 auto}
+.pf-item-vertical{max-width:31.64%}
+.pf-item-vertical .pf-thumb-wrap{padding-bottom:177.78%}
 .pf-thumb{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .7s ease,opacity .5s}
 .pf-item:not(.playing):hover .pf-thumb{transform:scale(1.06)}
 .pf-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;transition:all .3s}
@@ -325,7 +326,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .pf-page-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 
 /* ── WEATHER WIDGET ── */
-#weather-bar{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:.78rem;letter-spacing:.08em;color:var(--t2);margin-right:16px}
+#weather-bar{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:var(--datetime-size,.78rem);letter-spacing:.08em;color:var(--t2);margin-right:16px}
 #weather-bar i{font-size:1rem}
 #clock-time{font-family:var(--display);font-size:.72rem;letter-spacing:.08em;color:var(--t3)}
 #clock-weather-widget{transition:all .3s}
@@ -406,7 +407,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 <div id="intro-overlay">
   <canvas id="intro-canvas"></canvas>
   <img id="intro-logo-el" src="" alt="">
-  <div id="intro-tagline">MARK NO.5 VIDEO STUDIO</div>
+  <div id="intro-tagline">MARK NO.5.STUDIO</div>
 </div>
 
 <div id="share-bar">
@@ -678,11 +679,16 @@ var DEF = {
   footerCompany: '馬克伍號影像工作室．統一編號：82150195',
   footerCopyTpl: '© 2017–{YEAR} All Rights Reserved.',
   social: { 
-    facebookLink: 'https://www.facebook.com/markno.5.studio', 
-    instagramLink: 'https://www.instagram.com/mark_no.5_studio/', 
+    facebookLink: 'https://www.facebook.com/markno.5.studio',
+    facebookShow: true,
+    instagramLink: 'https://www.instagram.com/mark_no.5_studio/',
+    instagramShow: true,
     threadsLink: 'https://www.threads.net/@mark_no.5_studio',
+    threadsShow: true,
     youtubeLink: 'https://www.youtube.com/@markno5studio',
-    lineId: 'marcus0403_c' 
+    youtubeShow: true,
+    lineId: 'marcus0403_c',
+    lineShow: true
   },
   pfCategories: ['品牌形象廣告','企業形象廣告','募資影片','活動紀錄','短影音','音樂錄影帶','動畫製作'],
   formChecklist: ['拍攝影片','後期剪輯','動畫製作','4K 規格','HD 規格','直式影片','橫式影片','影片長度討論','2D 動畫','3D 動畫','燈光設備','專業收音','讀稿機','特殊需求'],
@@ -703,7 +709,8 @@ var DEF = {
   theme: { bgColor:'#09090B', bg2Color:'#0F0F12', bg3Color:'#161618', goldColor:'#C9963A', t1Color:'#F0EBE2', t2Color:'#C8C2B6', t3Color:'#9A948C', heroEnFont:'Google Sans Flex', heroEnSize:'7.5rem', heroZhSize:'2.6rem', scrollColor:'rgba(255,255,255,0.55)', scrollSize:'1rem', scrollFont:'Bebas Neue', labelSize:'0.92rem',
     rippleColor:'rgba(201,150,58,0.85)', rippleOpacity:'0.85', rippleSize:'86px', rippleWidth:'3px',
     procNumOpacity:'0.18', procNumHoverOpacity:'1.0',
-    introLogoSize:'200px'
+    introLogoSize:'300px',
+    datetimeSize:'.78rem'
   },
   backendSettings: {
     autoLogoutMinutes: 5, // 預設 5 分鐘後自動登出
@@ -717,9 +724,9 @@ var DEF = {
   editLog: [],
   analytics: { pageViews:0, byDate:{}, byDevice:{}, bySource:{} },
   users: [
-    { username:'mark', password:'mark888', role:'super_admin', name:'超級執行長 Mark', online:false, lastSeen:'', avatar:'' },
-    { username:'ops',  password:'ops888',  role:'ops_admin',   name:'營運長',           online:false, lastSeen:'', avatar:'' },
-    { username:'pro',  password:'pro123',  role:'editor',      name:'優秀人員',         online:false, lastSeen:'', avatar:'' }
+    { username:'mark', password:'mark888', role:'super_admin', name:'超級執行長 Mark', online:false, lastSeen:'', avatar:'', permissions:[] },
+    { username:'ops',  password:'ops888',  role:'ops_admin',   name:'營運長',           online:false, lastSeen:'', avatar:'', permissions:[] },
+    { username:'pro',  password:'pro123',  role:'editor',      name:'優秀人員',         online:false, lastSeen:'', avatar:'', permissions:[] }
   ]
 };
 
@@ -729,6 +736,18 @@ var DEF = {
 var D = null, CU = null, CF = 'All', SQ = '', carIdx = 0, carTimer = null, PF_PAGE = 0;
 var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
+
+// 權限管理項目
+var EDITABLE_ITEMS = ['heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
+var EDITABLE_NAMES = {
+  heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
+  introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
+  logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',
+  socialFacebook:'Facebook 連結',socialInstagram:'Instagram 連結',socialThreads:'Threads 連結',socialYoutube:'YouTube 連結',socialLine:'LINE ID',
+  rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
+  procNumOpacity:'流程數字預設亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
+  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email'
+};
 
 /* ============================================================
    AUDIO ENGINE (no closures that break, pure functions)
@@ -949,6 +968,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('click', function() { try { getAC(); } catch(e) {} }, { once: true });
   loadData();
   applyTheme();
+  updateDOM();
   runIntro();
   bindEvents();
   
@@ -1043,7 +1063,8 @@ function applyTheme() {
   r.setProperty('--ripple-color', rippleColorFinal);
   r.setProperty('--ripple-size', t.rippleSize || '86px');
   r.setProperty('--ripple-width', t.rippleWidth || '3px');
-  r.setProperty('--intro-logo-size', t.introLogoSize || '200px');
+  r.setProperty('--intro-logo-size', t.introLogoSize || '300px');
+  r.setProperty('--datetime-size', t.datetimeSize || '.78rem');
   /* Process number dim */
   var pno = parseFloat(t.procNumOpacity || '0.18');
   var pnho = parseFloat(t.procNumHoverOpacity || '1.0');
@@ -1131,8 +1152,11 @@ function canEdit(key) {
     return true; // 其他欄位都可以編輯
   }
   
-  // 優秀人員：僅限 EDITOR_KEYS 定義的欄位
+  // 優秀人員：檢查自定義權限
   if (CU.role === 'editor') {
+    if (CU.permissions && CU.permissions.length > 0) {
+      return CU.permissions.indexOf(key) !== -1;
+    }
     return !!EDITOR_KEYS[key];
   }
   
@@ -1166,11 +1190,27 @@ function updateDOM() {
   var pu = encodeURIComponent(location.href);
   var sfb = document.getElementById('share-fb'), sln = document.getElementById('share-line');
   var sig = document.getElementById('share-ig'), sth = document.getElementById('share-threads'), syt = document.getElementById('share-youtube');
-  if (sfb) sfb.href = 'https://www.facebook.com/sharer/sharer.php?u=' + pu;
-  if (sln) sln.href = 'https://social-plugins.line.me/lineit/share?url=' + pu;
-  if (sig && D.social) sig.href = D.social.instagramLink || 'https://www.instagram.com/';
-  if (sth && D.social) sth.href = D.social.threadsLink || 'https://www.threads.net/';
-  if (syt && D.social) syt.href = D.social.youtubeLink || 'https://www.youtube.com/';
+  
+  if (sfb) {
+    sfb.href = 'https://www.facebook.com/sharer/sharer.php?u=' + pu;
+    sfb.style.display = (D.social && D.social.facebookShow === false) ? 'none' : '';
+  }
+  if (sln) {
+    sln.href = 'https://social-plugins.line.me/lineit/share?url=' + pu;
+    sln.style.display = (D.social && D.social.lineShow === false) ? 'none' : '';
+  }
+  if (sig && D.social) {
+    sig.href = D.social.instagramLink || 'https://www.instagram.com/';
+    sig.style.display = (D.social.instagramShow === false) ? 'none' : '';
+  }
+  if (sth && D.social) {
+    sth.href = D.social.threadsLink || 'https://www.threads.net/';
+    sth.style.display = (D.social.threadsShow === false) ? 'none' : '';
+  }
+  if (syt && D.social) {
+    syt.href = D.social.youtubeLink || 'https://www.youtube.com/';
+    syt.style.display = (D.social.youtubeShow === false) ? 'none' : '';
+  }
 
   var els = document.querySelectorAll('[data-key]');
   for (var i = 0; i < els.length; i++) {
@@ -2019,6 +2059,8 @@ window.openBackendSettings = function() {
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'200px') + '" placeholder="200px"></label>' +
       '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：網站開啟時的動畫 Logo 大小（如：200px, 300px, 400px）</small>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'.78rem') + '" placeholder=".78rem"></label>' +
+      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem, 1.2rem）</small>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<select id="bs-hero-en-font" class="swal2-input" style="margin-top:4px">' +
         '<option value="Iansui"' + (t.heroEnFont==='Iansui'?' selected':'') + '>Iansui</option>' +
         '<option value="Bebas Neue"' + (t.heroEnFont==='Bebas Neue'?' selected':'') + '>Bebas Neue</option>' +
@@ -2050,11 +2092,11 @@ window.openBackendSettings = function() {
       
       // === 社群連結 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Facebook：<input id="bs-fb-link" class="swal2-input" style="margin-top:4px" value="' + (social.facebookLink||'') + '" placeholder="https://www.facebook.com/..."></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Instagram：<input id="bs-ig-link" class="swal2-input" style="margin-top:4px" value="' + (social.instagramLink||'') + '" placeholder="https://www.instagram.com/..."></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Threads：<input id="bs-threads-link" class="swal2-input" style="margin-top:4px" value="' + (social.threadsLink||'') + '" placeholder="https://www.threads.net/..."></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">YouTube：<input id="bs-youtube-link" class="swal2-input" style="margin-top:4px" value="' + (social.youtubeLink||'') + '" placeholder="https://www.youtube.com/..."></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">LINE ID：<input id="bs-line-id" class="swal2-input" style="margin-top:4px" value="' + (social.lineId||'') + '" placeholder="LINE ID"></label>' +
+      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-fb-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.facebookLink||'') + '" placeholder="https://www.facebook.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-ig-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.instagramLink||'') + '" placeholder="https://www.instagram.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-threads-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.threadsLink||'') + '" placeholder="https://www.threads.net/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-youtube-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.youtubeLink||'') + '" placeholder="https://www.youtube.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-line-id" class="swal2-input" style="flex:1;margin:0" value="' + (social.lineId||'') + '" placeholder="LINE ID"><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
       
       // === 光暈設定 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>' +
@@ -2092,15 +2134,21 @@ window.openBackendSettings = function() {
         heroDesc: document.getElementById('bs-hero-desc').value,
         // 外觀
         introLogoSize: document.getElementById('bs-intro-logo-size').value,
+        datetimeSize: document.getElementById('bs-datetime-size').value,
         heroEnFont: document.getElementById('bs-hero-en-font').value,
         heroEnSize: document.getElementById('bs-hero-en-size').value,
         heroZhSize: document.getElementById('bs-hero-zh-size').value,
         // 社群連結
         facebookLink: document.getElementById('bs-fb-link').value,
+        facebookShow: document.getElementById('bs-fb-show').checked,
         instagramLink: document.getElementById('bs-ig-link').value,
+        instagramShow: document.getElementById('bs-ig-show').checked,
         threadsLink: document.getElementById('bs-threads-link').value,
+        threadsShow: document.getElementById('bs-threads-show').checked,
         youtubeLink: document.getElementById('bs-youtube-link').value,
+        youtubeShow: document.getElementById('bs-youtube-show').checked,
         lineId: document.getElementById('bs-line-id').value,
+        lineShow: document.getElementById('bs-line-show').checked,
         // 光暈
         rippleColor: document.getElementById('bs-ripple-color').value,
         rippleOpacity: document.getElementById('bs-ripple-opacity').value,
@@ -2128,6 +2176,7 @@ window.openBackendSettings = function() {
       // 更新 theme
       if (!D.theme) D.theme = {};
       D.theme.introLogoSize = v.introLogoSize;
+      D.theme.datetimeSize = v.datetimeSize;
       D.theme.heroEnFont = v.heroEnFont;
       D.theme.heroEnSize = v.heroEnSize;
       D.theme.heroZhSize = v.heroZhSize;
@@ -2141,10 +2190,15 @@ window.openBackendSettings = function() {
       // 更新社群連結
       if (!D.social) D.social = {};
       D.social.facebookLink = v.facebookLink;
+      D.social.facebookShow = v.facebookShow;
       D.social.instagramLink = v.instagramLink;
+      D.social.instagramShow = v.instagramShow;
       D.social.threadsLink = v.threadsLink;
+      D.social.threadsShow = v.threadsShow;
       D.social.youtubeLink = v.youtubeLink;
+      D.social.youtubeShow = v.youtubeShow;
       D.social.lineId = v.lineId;
+      D.social.lineShow = v.lineShow;
       
       // 更新 backendSettings
       if (!D.backendSettings) D.backendSettings = {};
@@ -2314,14 +2368,41 @@ window.showUsers = function() {
               '<option value="editor"' + (u.role==='editor'?' selected':'') + '>一般編輯</option>' +
               '<option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option>' +
               '<option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option>' +
-            '</select>',
+            '</select>' +
+            '<div id="perm-section" style="margin-top:16px;text-align:left">' +
+              '<strong style="color:var(--gold);font-size:.85rem;display:block;margin-bottom:8px">可編輯項目：</strong>' +
+              '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--t3);padding:10px;background:var(--bg2)">' +
+                '<div id="perm-list"></div>' +
+              '</div>' +
+            '</div>',
       showCancelButton: true, confirmButtonText: '儲存',
+      didOpen: function() {
+        var permList = document.getElementById('perm-list');
+        var uPerms = u.permissions || [];
+        var html = '';
+        for (var j = 0; j < EDITABLE_ITEMS.length; j++) {
+          var itemId = EDITABLE_ITEMS[j];
+          var itemName = EDITABLE_NAMES[itemId] || itemId;
+          var checked = uPerms.indexOf(itemId) >= 0 ? ' checked' : '';
+          html += '<label style="display:block;margin-bottom:6px;font-size:.8rem;cursor:pointer">' +
+                  '<input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
+        }
+        permList.innerHTML = html;
+      },
       preConfirm: function() {
         var nm = document.getElementById('eu-nm').value.trim();
         var un = document.getElementById('eu-un').value.trim();
         var pw = document.getElementById('eu-pw').value;
+        var role = document.getElementById('eu-ro').value;
         if (!nm || !un) { Swal.showValidationMessage('名稱和帳號必填'); return false; }
-        return { name:nm, username:un, password:pw||u.password, role:document.getElementById('eu-ro').value };
+        
+        var permissions = [];
+        var cbs = document.querySelectorAll('.perm-cb:checked');
+        for (var k = 0; k < cbs.length; k++) {
+          permissions.push(cbs[k].value);
+        }
+        
+        return { name:nm, username:un, password:pw||u.password, role:role, permissions:permissions };
       }
     }).then(function(r) {
       if (r.isConfirmed) {
