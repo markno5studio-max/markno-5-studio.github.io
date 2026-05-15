@@ -326,7 +326,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .pf-page-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 
 /* ── WEATHER WIDGET ── */
-#weather-bar{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:var(--datetime-size,.78rem);letter-spacing:.08em;color:var(--t2);margin-right:16px}
+#weather-bar{display:flex;align-items:center;gap:10px;font-family:var(--datetime-font,var(--display));font-size:var(--datetime-size,.78rem);letter-spacing:.08em;color:var(--t2);margin-right:16px}
 #weather-bar i{font-size:1rem}
 #clock-time{font-family:var(--display);font-size:.72rem;letter-spacing:.08em;color:var(--t3)}
 #clock-weather-widget{transition:all .3s}
@@ -604,7 +604,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     <button class="admin-btn" data-role="editor" onclick="editPortfolio(-1)">＋ 作品</button>
     <button class="admin-btn" data-role="editor" onclick="showAnalytics()">📊 數據</button>
     <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
-    <button class="admin-btn" data-role="editor" onclick="openBackendSettings()">⚙️ 後台設定</button>
+    <button class="admin-btn" id="backend-settings-btn" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
     <button class="admin-btn" data-role="editor" onclick="editMyProfile()">👤 我的帳號</button>
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
@@ -712,7 +712,8 @@ var DEF = {
     rippleColor:'rgba(201,150,58,0.85)', rippleOpacity:'0.85', rippleSize:'86px', rippleWidth:'3px',
     procNumOpacity:'0.18', procNumHoverOpacity:'1.0',
     introLogoSize:'300px',
-    datetimeSize:'.78rem'
+    datetimeSize:'.78rem',
+    datetimeFont:'Bebas Neue'
   },
   backendSettings: {
     autoLogoutMinutes: 5, // 預設 5 分鐘後自動登出
@@ -740,7 +741,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -1069,6 +1070,7 @@ function applyTheme() {
   r.setProperty('--ripple-width', t.rippleWidth || '3px');
   r.setProperty('--intro-logo-size', t.introLogoSize || '300px');
   r.setProperty('--datetime-size', t.datetimeSize || '.78rem');
+  r.setProperty('--datetime-font', t.datetimeFont || 'Bebas Neue');
   r.setProperty('--intro-tagline-size', D.introTaglineSize || '1rem');
   /* Process number dim */
   var pno = parseFloat(t.procNumOpacity || '0.18');
@@ -1239,6 +1241,12 @@ function renderFooterCopy() {
   var el = document.getElementById('footer-copy-el'); if (!el) return;
   var tpl = D.footerCopyTpl || DEF.footerCopyTpl;
   el.textContent = tpl.replace('{YEAR}', new Date().getFullYear());
+
+  // 更新 hero subtitle
+  var heroSub = document.querySelector('.hero-subtitle, #hero-subtitle');
+  if (heroSub && D.heroSubtitle) {
+    heroSub.textContent = D.heroSubtitle;
+  }
 }
 
 /* ============================================================
@@ -1890,10 +1898,23 @@ function updateAdminUI() {
     // 按鈕權限控制
     var btns = document.querySelectorAll('.admin-btn');
     for (var i = 0; i < btns.length; i++) {
+      var btnId = btns[i].id;
       var req = btns[i].getAttribute('data-role') || 'editor';
       var ok = false;
       
-      if (req === 'editor') {
+      // 後台設定按鈕特殊處理
+      if (btnId === 'backend-settings-btn') {
+        if (CU.role === 'super_admin') {
+          ok = true; // 超級執行長一定顯示
+        } else {
+          // 其他人：檢查是否有任何權限
+          var hasAnyPermission = false;
+          if (CU.permissions && CU.permissions.length > 0) {
+            hasAnyPermission = true;
+          }
+          ok = hasAnyPermission;
+        }
+      } else if (req === 'editor') {
         ok = true; // 所有角色都可以使用 editor 級別的按鈕
       } else if (req === 'ops_admin') {
         ok = (CU.role === 'super_admin' || CU.role === 'ops_admin');
@@ -2052,81 +2073,124 @@ window.openBackendSettings = function() {
   Swal.fire({
     title: '⚙️ 後台設定',
     width: 920,
-    html: '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:680px;overflow-y:auto;padding:10px">' +
+    html: (function() {
+      var h = '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:680px;overflow-y:auto;padding:10px">';
+      var isSuperAdmin = CU && CU.role === 'super_admin';
       
-      // === 首頁設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Logo 下方小標 (heroSubtitle)：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標 (heroEnTitle)：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標 (heroZhTitle)：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="讓影像，真正為品牌帶來價值"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">說明文字 (heroDesc)：<textarea id="bs-hero-desc" class="swal2-input" style="margin-top:4px;height:60px;resize:vertical" placeholder="首頁說明文字">' + (D.heroDesc||'') + '</textarea></label>' +
+      // 首頁設定
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>';
       
-      // === 外觀設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'200px') + '" placeholder="200px"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：網站開啟時的動畫 Logo 大小（如：200px, 300px, 400px）</small>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem）</small>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<select id="bs-hero-en-font" class="swal2-input" style="margin-top:4px">' +
-        '<option value="Iansui"' + (t.heroEnFont==='Iansui'?' selected':'') + '>Iansui</option>' +
-        '<option value="Bebas Neue"' + (t.heroEnFont==='Bebas Neue'?' selected':'') + '>Bebas Neue</option>' +
-        '<option value="Google Sans Flex"' + (t.heroEnFont==='Google Sans Flex'?' selected':'') + '>Google Sans Flex</option>' +
-      '</select></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'7.5rem') + '" placeholder="7.5rem"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'2.6rem') + '" placeholder="2.6rem"></label>' +
+      if (isSuperAdmin || canEdit('introTagline')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
+      }
+      if (isSuperAdmin || canEdit('introTaglineSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroSubtitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">Logo 下方小標：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnTitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroZhTitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="馬克伍號影像工作室"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroDesc')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
+      }
       
-      // === Logo 設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔄 Logo 設定</h3>' +
-      '<p style="font-size:.85rem;color:var(--t2);margin-bottom:10px">目前 Logo：</p>' +
-      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
-        '<img src="' + (D.logoData || '') + '" style="width:60px;height:60px;border-radius:50%;border:2px solid var(--gold)">' +
-        '<button onclick="changeLogo()" class="swal2-confirm swal2-styled" style="margin:0">上傳新 Logo</button>' +
-      '</div>' +
-      '<small style="color:var(--t3);font-size:.75rem">提示：Logo 會顯示在網站左上角（38x38px）和開場動畫</small>' +
+      // 外觀設定
+      var t = D.theme || {};
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>';
       
-      // === 輪播設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🖼 輪播設定</h3>' +
-      '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前輪播圖片（' + (D.carousel ? D.carousel.length : 0) + ' 張）：</p>' +
-      carouselHtml +
-      '<button onclick="manageCarousel()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理輪播圖片</button>' +
+      if (isSuperAdmin || canEdit('introLogoSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
+      }
+      if (isSuperAdmin || canEdit('datetimeSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
+      }
+      if (isSuperAdmin || canEdit('datetimeFont')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnFont')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroZhSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
+      }
       
-      // === 分類設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏷 分類設定</h3>' +
-      '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前作品分類（' + (D.pfCategories ? D.pfCategories.length : 0) + ' 個）：</p>' +
-      categoriesHtml +
-      '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>' +
+      // 社群連結
+      var social = D.social || {};
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>';
       
-      // === 社群連結 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>' +
-      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '" placeholder="https://www.facebook.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '" placeholder="https://www.instagram.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '" placeholder="https://www.threads.net/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '" placeholder="https://www.youtube.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '" placeholder="LINE ID"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      if (isSuperAdmin || canEdit('socialFacebook')) {
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+      }
+      if (isSuperAdmin || canEdit('socialInstagram')) {
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+      }
+      if (isSuperAdmin || canEdit('socialThreads')) {
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+      }
+      if (isSuperAdmin || canEdit('socialYoutube')) {
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+      }
+      if (isSuperAdmin || canEdit('socialLine')) {
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+      }
       
-      // === 光暈設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'rgba(201,150,58,0.85)') + '" placeholder="rgba(201,150,58,0.85)"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">亮度（0-1）：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.05" min="0" max="1" value="' + (t.rippleOpacity||'0.85') + '" placeholder="0.85"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'86px') + '" placeholder="86px"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'3px') + '" placeholder="3px"></label>' +
+      // 光暈設定
+      var hasRipplePermission = isSuperAdmin || canEdit('rippleColor') || canEdit('rippleOpacity') || canEdit('rippleSize') || canEdit('rippleWidth');
+      if (hasRipplePermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>';
+        if (isSuperAdmin || canEdit('rippleColor')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+        }
+        if (isSuperAdmin || canEdit('rippleOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+        }
+        if (isSuperAdmin || canEdit('rippleSize')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+        }
+        if (isSuperAdmin || canEdit('rippleWidth')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+        }
+      }
       
-      // === 流程數字亮度 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">預設亮度（0-1）：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.01" min="0" max="1" value="' + (t.procNumOpacity||'0.18') + '"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">Hover 亮度（0-1）：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.01" min="0" max="1" value="' + (t.procNumHoverOpacity||'1.0') + '"></label>' +
+      // 流程數字亮度
+      var hasProcPermission = isSuperAdmin || canEdit('procNumOpacity') || canEdit('procNumHoverOpacity');
+      if (hasProcPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>';
+        if (isSuperAdmin || canEdit('procNumOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
+        }
+        if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
+        }
+      }
       
-      // === 系統設定 ===
-      '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：預設為 5 分鐘，範圍 1-120 分鐘</small>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'© {YEAR} 馬克伍號影像工作室。保留所有權利。') + '" placeholder="© {YEAR} 公司名稱"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：{YEAR} 會自動替換為當前年份</small>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" value="' + (bs.sendMessageEmail||'') + '" placeholder="留空使用 contactEmail"></label>' +
+      // 系統設定
+      var bs = D.backendSettings || {};
+      var hasSysPermission = isSuperAdmin || canEdit('autoLogout') || canEdit('copyright') || canEdit('email');
+      if (hasSysPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>';
+        if (isSuperAdmin || canEdit('autoLogout')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+        }
+        if (isSuperAdmin || canEdit('copyright')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+        }
+        if (isSuperAdmin || canEdit('email')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+        }
+      }
       
-      '</div>',
+      h += '</div>';
+      return h;
+    })(),
     confirmButtonText: '💾 儲存所有設定',
     showCancelButton: true,
     cancelButtonText: '取消',
@@ -2145,62 +2209,151 @@ window.openBackendSettings = function() {
       }
     },
     preConfirm: function() {
-      return {
-        // 首頁
-        introTagline: document.getElementById('bs-intro-tagline').value,
-        introTaglineSize: document.getElementById('bs-intro-tagline-size').value,
-        heroSubtitle: document.getElementById('bs-hero-subtitle').value,
-        heroEnTitle: document.getElementById('bs-hero-en').value,
-        heroZhTitle: document.getElementById('bs-hero-zh').value,
-        heroDesc: document.getElementById('bs-hero-desc').value,
-        // 外觀
-        introLogoSize: document.getElementById('bs-intro-logo-size').value,
-        datetimeSize: document.getElementById('bs-datetime-size').value,
-        heroEnFont: document.getElementById('bs-hero-en-font').value,
-        heroEnSize: document.getElementById('bs-hero-en-size').value,
-        heroZhSize: document.getElementById('bs-hero-zh-size').value,
-        // 社群連結
-        facebookLink: document.getElementById('bs-fb-link').value,
-        facebookShow: document.getElementById('bs-fb-show').checked,
-        instagramLink: document.getElementById('bs-ig-link').value,
-        instagramShow: document.getElementById('bs-ig-show').checked,
-        threadsLink: document.getElementById('bs-threads-link').value,
-        threadsShow: document.getElementById('bs-threads-show').checked,
-        youtubeLink: document.getElementById('bs-youtube-link').value,
-        youtubeShow: document.getElementById('bs-youtube-show').checked,
-        lineId: document.getElementById('bs-line-id').value,
-        lineShow: document.getElementById('bs-line-show').checked,
-        // 光暈
-        rippleColor: document.getElementById('bs-ripple-color').value,
-        rippleOpacity: document.getElementById('bs-ripple-opacity').value,
-        rippleSize: document.getElementById('bs-ripple-size').value,
-        rippleWidth: document.getElementById('bs-ripple-width').value,
-        // 流程數字
-        procNumOpacity: document.getElementById('bs-proc-dim').value,
-        procNumHoverOpacity: document.getElementById('bs-proc-hover').value,
-        // 系統
-        autoLogoutMinutes: parseInt(document.getElementById('bs-auto-logout').value) || 5,
-        copyrightTemplate: document.getElementById('bs-copyright').value,
-        sendMessageEmail: document.getElementById('bs-send-email').value
-      };
+      var v = {};
+      var isSuperAdmin = CU && CU.role === 'super_admin';
+      
+      // 超級執行長或有權限的人才收集
+      if (isSuperAdmin || canEdit('introTagline')) {
+        var el = document.getElementById('bs-intro-tagline');
+        if (el) v.introTagline = el.value;
+      }
+      if (isSuperAdmin || canEdit('introTaglineSize')) {
+        var el = document.getElementById('bs-intro-tagline-size');
+        if (el) v.introTaglineSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroSubtitle')) {
+        var el = document.getElementById('bs-hero-subtitle');
+        if (el) v.heroSubtitle = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroEnTitle')) {
+        var el = document.getElementById('bs-hero-en');
+        if (el) v.heroEnTitle = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroZhTitle')) {
+        var el = document.getElementById('bs-hero-zh');
+        if (el) v.heroZhTitle = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroDesc')) {
+        var el = document.getElementById('bs-hero-desc');
+        if (el) v.heroDesc = el.value;
+      }
+      if (isSuperAdmin || canEdit('introLogoSize')) {
+        var el = document.getElementById('bs-intro-logo-size');
+        if (el) v.introLogoSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('datetimeSize')) {
+        var el = document.getElementById('bs-datetime-size');
+        if (el) v.datetimeSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('datetimeFont')) {
+        var el = document.getElementById('bs-datetime-font');
+        if (el) v.datetimeFont = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroEnFont')) {
+        var el = document.getElementById('bs-hero-en-font');
+        if (el) v.heroEnFont = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroEnSize')) {
+        var el = document.getElementById('bs-hero-en-size');
+        if (el) v.heroEnSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('heroZhSize')) {
+        var el = document.getElementById('bs-hero-zh-size');
+        if (el) v.heroZhSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('socialFacebook')) {
+        var link = document.getElementById('bs-fb-link');
+        var show = document.getElementById('bs-fb-show');
+        if (link) v.facebookLink = link.value;
+        if (show) v.facebookShow = show.checked;
+      }
+      if (isSuperAdmin || canEdit('socialInstagram')) {
+        var link = document.getElementById('bs-ig-link');
+        var show = document.getElementById('bs-ig-show');
+        if (link) v.instagramLink = link.value;
+        if (show) v.instagramShow = show.checked;
+      }
+      if (isSuperAdmin || canEdit('socialThreads')) {
+        var link = document.getElementById('bs-threads-link');
+        var show = document.getElementById('bs-threads-show');
+        if (link) v.threadsLink = link.value;
+        if (show) v.threadsShow = show.checked;
+      }
+      if (isSuperAdmin || canEdit('socialYoutube')) {
+        var link = document.getElementById('bs-youtube-link');
+        var show = document.getElementById('bs-youtube-show');
+        if (link) v.youtubeLink = link.value;
+        if (show) v.youtubeShow = show.checked;
+      }
+      if (isSuperAdmin || canEdit('socialLine')) {
+        var link = document.getElementById('bs-line-id');
+        var show = document.getElementById('bs-line-show');
+        if (link) v.lineId = link.value;
+        if (show) v.lineShow = show.checked;
+      }
+      
+      // 光暈設定
+      if (isSuperAdmin || canEdit('rippleColor')) {
+        var el = document.getElementById('bs-ripple-color');
+        if (el) v.rippleColor = el.value;
+      }
+      if (isSuperAdmin || canEdit('rippleOpacity')) {
+        var el = document.getElementById('bs-ripple-opacity');
+        if (el) v.rippleOpacity = el.value;
+      }
+      if (isSuperAdmin || canEdit('rippleSize')) {
+        var el = document.getElementById('bs-ripple-size');
+        if (el) v.rippleSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('rippleWidth')) {
+        var el = document.getElementById('bs-ripple-width');
+        if (el) v.rippleWidth = el.value;
+      }
+      
+      // 流程數字
+      if (isSuperAdmin || canEdit('procNumOpacity')) {
+        var el = document.getElementById('bs-proc-dim');
+        if (el) v.procNumOpacity = el.value;
+      }
+      if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
+        var el = document.getElementById('bs-proc-hover');
+        if (el) v.procNumHoverOpacity = el.value;
+      }
+      
+      // 系統設定
+      if (isSuperAdmin || canEdit('autoLogout')) {
+        var el = document.getElementById('bs-auto-logout');
+        if (el) v.autoLogout = el.value;
+      }
+      if (isSuperAdmin || canEdit('copyright')) {
+        var el = document.getElementById('bs-copyright');
+        if (el) v.copyright = el.value;
+      }
+      if (isSuperAdmin || canEdit('email')) {
+        var el = document.getElementById('bs-send-email');
+        if (el) v.email = el.value;
+      }
+      
+      return v;
     }
   }).then(function(result) {
     if (result.isConfirmed) {
       var v = result.value;
       
       // 更新首頁設定
-      D.introTagline = v.introTagline;
-      D.introTaglineSize = v.introTaglineSize;
-      D.heroSubtitle = v.heroSubtitle;
-      D.heroEnTitle = v.heroEnTitle;
+      if (v.introTagline !== undefined) D.introTagline = v.introTagline;
+      if (v.introTaglineSize !== undefined) D.introTaglineSize = v.introTaglineSize;
+      if (v.heroSubtitle !== undefined) D.heroSubtitle = v.heroSubtitle;
+      if (v.heroEnTitle !== undefined) D.heroEnTitle = v.heroEnTitle;
       D.heroZhTitle = v.heroZhTitle;
       D.heroDesc = v.heroDesc;
       
       // 更新 theme
       if (!D.theme) D.theme = {};
-      D.theme.introLogoSize = v.introLogoSize;
-      D.theme.datetimeSize = v.datetimeSize;
-      D.theme.heroEnFont = v.heroEnFont;
+      if (v.introLogoSize !== undefined) D.theme.introLogoSize = v.introLogoSize;
+      if (v.datetimeSize !== undefined) D.theme.datetimeSize = v.datetimeSize;
+      if (v.datetimeFont !== undefined) D.theme.datetimeFont = v.datetimeFont;
+      if (v.heroEnFont !== undefined) D.theme.heroEnFont = v.heroEnFont;
       D.theme.heroEnSize = v.heroEnSize;
       D.theme.heroZhSize = v.heroZhSize;
       D.theme.rippleColor = v.rippleColor;
@@ -2212,16 +2365,32 @@ window.openBackendSettings = function() {
       
       // 更新社群連結
       if (!D.social) D.social = {};
-      D.social.facebookLink = v.facebookLink;
-      D.social.facebookShow = v.facebookShow;
-      D.social.instagramLink = v.instagramLink;
-      D.social.instagramShow = v.instagramShow;
-      D.social.threadsLink = v.threadsLink;
-      D.social.threadsShow = v.threadsShow;
-      D.social.youtubeLink = v.youtubeLink;
-      D.social.youtubeShow = v.youtubeShow;
-      D.social.lineId = v.lineId;
-      D.social.lineShow = v.lineShow;
+      if (v.facebookLink !== undefined) D.social.facebookLink = v.facebookLink;
+      if (v.facebookShow !== undefined) D.social.facebookShow = v.facebookShow;
+      if (v.instagramLink !== undefined) D.social.instagramLink = v.instagramLink;
+      if (v.instagramShow !== undefined) D.social.instagramShow = v.instagramShow;
+      if (v.threadsLink !== undefined) D.social.threadsLink = v.threadsLink;
+      if (v.threadsShow !== undefined) D.social.threadsShow = v.threadsShow;
+      if (v.youtubeLink !== undefined) D.social.youtubeLink = v.youtubeLink;
+      if (v.youtubeShow !== undefined) D.social.youtubeShow = v.youtubeShow;
+      if (v.lineId !== undefined) D.social.lineId = v.lineId;
+      if (v.lineShow !== undefined) D.social.lineShow = v.lineShow;
+      
+      // 更新光暈設定
+      if (v.rippleColor !== undefined) D.theme.rippleColor = v.rippleColor;
+      if (v.rippleOpacity !== undefined) D.theme.rippleOpacity = v.rippleOpacity;
+      if (v.rippleSize !== undefined) D.theme.rippleSize = v.rippleSize;
+      if (v.rippleWidth !== undefined) D.theme.rippleWidth = v.rippleWidth;
+      
+      // 更新流程數字
+      if (v.procNumOpacity !== undefined) D.theme.procNumOpacity = v.procNumOpacity;
+      if (v.procNumHoverOpacity !== undefined) D.theme.procNumHoverOpacity = v.procNumHoverOpacity;
+      
+      // 更新系統設定
+      if (!D.backendSettings) D.backendSettings = {};
+      if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
+      if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
+      if (v.email !== undefined) D.contactEmail = v.email;
       
       // 更新 backendSettings
       if (!D.backendSettings) D.backendSettings = {};
@@ -2392,19 +2561,23 @@ window.showUsers = function() {
               '<option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option>' +
               '<option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option>' +
             '</select>' +
-            '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>',
+            (CU.role === 'super_admin' ? '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>' : ''),
       showCancelButton: true, confirmButtonText: '儲存',
       didOpen: function() {
-        var permList = document.getElementById('perm-list');
-        var uPerms = u.permissions || [];
-        var html = '';
-        for (var j = 0; j < EDITABLE_ITEMS.length; j++) {
-          var itemId = EDITABLE_ITEMS[j];
-          var itemName = EDITABLE_NAMES[itemId] || itemId;
-          var checked = uPerms.indexOf(itemId) >= 0 ? ' checked' : '';
-          html += '<label style="display:block;margin-bottom:6px;font-size:.85rem;cursor:pointer"><input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
+        if (CU.role === 'super_admin') {
+          var permList = document.getElementById('perm-list');
+          if (permList) {
+            var uPerms = u.permissions || [];
+            var html = '';
+            for (var j = 0; j < EDITABLE_ITEMS.length; j++) {
+              var itemId = EDITABLE_ITEMS[j];
+              var itemName = EDITABLE_NAMES[itemId] || itemId;
+              var checked = uPerms.indexOf(itemId) >= 0 ? ' checked' : '';
+              html += '<label style="display:block;margin-bottom:6px;font-size:.85rem;cursor:pointer"><input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
+            }
+            permList.innerHTML = html;
+          }
         }
-        permList.innerHTML = html;
       },
       preConfirm: function() {
         var nm = document.getElementById('eu-nm').value.trim();
