@@ -604,7 +604,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     <button class="admin-btn" data-role="editor" onclick="editPortfolio(-1)">＋ 作品</button>
     <button class="admin-btn" data-role="editor" onclick="showAnalytics()">📊 數據</button>
     <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
-    <button class="admin-btn" data-role="super_admin" onclick="openBackendSettings()">⚙️ 後台設定</button>
+    <button class="admin-btn" data-role="editor" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
     <button class="admin-btn" data-role="editor" onclick="editMyProfile()">👤 我的帳號</button>
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
@@ -739,16 +739,16 @@ var D = null, CU = null, CF = 'All', SQ = '', carIdx = 0, carTimer = null, PF_PA
 var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
-// 權限管理項目（包含 introTagline）
+// 權限管理 - 可編輯項目（28項）
 var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
   introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
   logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',
-  socialFacebook:'Facebook 連結',socialInstagram:'Instagram 連結',socialThreads:'Threads 連結',socialYoutube:'YouTube 連結',socialLine:'LINE ID',
+  socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
-  procNumOpacity:'流程數字預設亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
+  procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
   autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email'
 };
 
@@ -2012,10 +2012,11 @@ window.adminLogout = function() {
    BACKEND SETTINGS (super_admin only)
 ============================================================ */
 window.openBackendSettings = function() {
-  if (!CU || CU.role !== 'super_admin') {
-    Swal.fire({title:'無權限',text:'僅超級執行長可使用後台設定',icon:'error'});
+  if (!CU) {
+    Swal.fire({title:'無權限',text:'請先登入',icon:'error'});
     return;
   }
+  // 所有已登入的人都可以進入後台設定，但只能編輯有權限的項目
   
   var t = D.theme || {};
   var bs = D.backendSettings || {};
@@ -2049,15 +2050,14 @@ window.openBackendSettings = function() {
   }
   
   Swal.fire({
-    title: '⚙️ 完整後台設定（超級執行長專屬）',
+    title: '⚙️ 後台設定',
     width: 920,
     html: '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:680px;overflow-y:auto;padding:10px">' +
       
       // === 首頁設定 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'MARK NO.5.STUDIO') + '" placeholder="MARK NO.5.STUDIO"></label>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'1rem') + '" placeholder="1rem"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：開場動畫中大標題的文字和大小（需重新整理頁面）</small>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">Logo 下方小標 (heroSubtitle)：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標 (heroEnTitle)：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標 (heroZhTitle)：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="讓影像，真正為品牌帶來價值"></label>' +
@@ -2067,8 +2067,8 @@ window.openBackendSettings = function() {
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'200px') + '" placeholder="200px"></label>' +
       '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：網站開啟時的動畫 Logo 大小（如：200px, 300px, 400px）</small>' +
-      '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'.78rem') + '" placeholder=".78rem"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem, 1.2rem），修改後立即生效</small>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>' +
+      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem）</small>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<select id="bs-hero-en-font" class="swal2-input" style="margin-top:4px">' +
         '<option value="Iansui"' + (t.heroEnFont==='Iansui'?' selected':'') + '>Iansui</option>' +
         '<option value="Bebas Neue"' + (t.heroEnFont==='Bebas Neue'?' selected':'') + '>Bebas Neue</option>' +
@@ -2100,11 +2100,11 @@ window.openBackendSettings = function() {
       
       // === 社群連結 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>' +
-      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-fb-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.facebookLink||'') + '" placeholder="https://www.facebook.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-ig-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.instagramLink||'') + '" placeholder="https://www.instagram.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-threads-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.threadsLink||'') + '" placeholder="https://www.threads.net/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-youtube-link" class="swal2-input" style="flex:1;margin:0" value="' + (social.youtubeLink||'') + '" placeholder="https://www.youtube.com/..."><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
-      '<div style="margin-bottom:12px"><label style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</label><div style="display:flex;gap:10px;align-items:center"><input id="bs-line-id" class="swal2-input" style="flex:1;margin:0" value="' + (social.lineId||'') + '" placeholder="LINE ID"><label style="white-space:nowrap;font-size:.85rem"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '" placeholder="https://www.facebook.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '" placeholder="https://www.instagram.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '" placeholder="https://www.threads.net/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '" placeholder="https://www.youtube.com/..."></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
+      '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '" placeholder="LINE ID"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>' +
       
       // === 光暈設定 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>' +
@@ -2132,6 +2132,17 @@ window.openBackendSettings = function() {
     cancelButtonText: '取消',
     customClass: {
       container: 'backend-settings-modal'
+    },
+    didOpen: function() {
+      var modal = document.querySelector('.swal2-popup');
+      if (modal) {
+        modal.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            Swal.clickConfirm();
+          }
+        });
+      }
     },
     preConfirm: function() {
       return {
@@ -2218,7 +2229,7 @@ window.openBackendSettings = function() {
       D.backendSettings.copyrightTemplate = v.copyrightTemplate;
       D.backendSettings.sendMessageEmail = v.sendMessageEmail;
       
-      logEdit(['heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings']);
+      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings']);
       persist();
       applyTheme();
       updateDOM();
@@ -2381,12 +2392,7 @@ window.showUsers = function() {
               '<option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option>' +
               '<option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option>' +
             '</select>' +
-            '<div id="perm-section" style="margin-top:16px;text-align:left">' +
-              '<strong style="color:var(--gold);font-size:.85rem;display:block;margin-bottom:8px">可編輯項目：</strong>' +
-              '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--t3);padding:10px;background:var(--bg2)">' +
-                '<div id="perm-list"></div>' +
-              '</div>' +
-            '</div>',
+            '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>',
       showCancelButton: true, confirmButtonText: '儲存',
       didOpen: function() {
         var permList = document.getElementById('perm-list');
@@ -2396,8 +2402,7 @@ window.showUsers = function() {
           var itemId = EDITABLE_ITEMS[j];
           var itemName = EDITABLE_NAMES[itemId] || itemId;
           var checked = uPerms.indexOf(itemId) >= 0 ? ' checked' : '';
-          html += '<label style="display:block;margin-bottom:6px;font-size:.8rem;cursor:pointer">' +
-                  '<input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
+          html += '<label style="display:block;margin-bottom:6px;font-size:.85rem;cursor:pointer"><input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
         }
         permList.innerHTML = html;
       },
@@ -2407,13 +2412,9 @@ window.showUsers = function() {
         var pw = document.getElementById('eu-pw').value;
         var role = document.getElementById('eu-ro').value;
         if (!nm || !un) { Swal.showValidationMessage('名稱和帳號必填'); return false; }
-        
         var permissions = [];
         var cbs = document.querySelectorAll('.perm-cb:checked');
-        for (var k = 0; k < cbs.length; k++) {
-          permissions.push(cbs[k].value);
-        }
-        
+        for (var k = 0; k < cbs.length; k++) permissions.push(cbs[k].value);
         return { name:nm, username:un, password:pw||u.password, role:role, permissions:permissions };
       }
     }).then(function(r) {
