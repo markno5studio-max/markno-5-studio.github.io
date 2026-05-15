@@ -400,6 +400,17 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .video-modal-content{width:95vw;border-radius:4px}
 .video-modal-close{top:-45px;font-size:1.5rem;width:45px;height:45px}
 }
+
+.portfolio-item.vertical {
+  aspect-ratio: 9/16;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.portfolio-item.vertical iframe {
+  width: 100%;
+  height: 100%;
+}
 </style>
 </head>
 <body>
@@ -606,7 +617,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
     <button class="admin-btn" id="backend-settings-btn" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
-    <button class="admin-btn" data-role="editor" onclick="editMyProfile()">👤 我的帳號</button>
+
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
     <button class="admin-btn logout" data-role="editor" onclick="adminLogout()">登出</button>
   </div>
@@ -1246,6 +1257,18 @@ function renderFooterCopy() {
   var heroSub = document.querySelector('.hero-subtitle, #hero-subtitle');
   if (heroSub && D.heroSubtitle) {
     heroSub.textContent = D.heroSubtitle;
+  }
+
+  // 更新首頁英文大標
+  var heroEn = document.querySelector('.hero-en-title, #hero-en-title');
+  if (heroEn && D.heroEnTitle) {
+    heroEn.textContent = D.heroEnTitle;
+  }
+  
+  // 更新首頁中文副標
+  var heroZh = document.querySelector('.hero-zh-title, #hero-zh-title');
+  if (heroZh && D.heroZhTitle) {
+    heroZh.textContent = D.heroZhTitle;
   }
 }
 
@@ -2564,6 +2587,7 @@ window.showUsers = function() {
             (CU.role === 'super_admin' ? '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>' : ''),
       showCancelButton: true, confirmButtonText: '儲存',
       didOpen: function() {
+        addEnterKeyHandler();
         if (CU.role === 'super_admin') {
           var permList = document.getElementById('perm-list');
           if (permList) {
