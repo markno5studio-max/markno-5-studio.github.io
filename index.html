@@ -44,7 +44,7 @@ body{background:var(--bg);color:var(--t1);font-family:var(--serif);font-weight:3
 #intro-overlay{position:fixed;inset:0;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #intro-canvas{position:absolute;inset:0;width:100%;height:100%}
 #intro-logo-el{position:absolute;width:var(--intro-logo-size,300px);height:var(--intro-logo-size,300px);border-radius:50%;object-fit:cover;border:2px solid transparent;opacity:0;transform:scale(1.06);z-index:3;filter:blur(6px)}
-#intro-tagline{position:absolute;bottom:26%;font-family:var(--display);font-size:clamp(.75rem,1.5vw,1rem);letter-spacing:.45em;color:var(--gold);opacity:0;z-index:3}
+#intro-tagline{position:absolute;bottom:26%;font-family:var(--display);font-size:var(--intro-tagline-size,1rem);letter-spacing:.45em;color:var(--gold);opacity:0;z-index:3}
 
 /* Share bar */
 #share-bar{position:fixed;top:0;left:0;right:0;height:30px;background:rgba(9,9,11,.97);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;padding:0 6%;gap:12px;z-index:1002}
@@ -640,6 +640,8 @@ var OPS_ADMIN_RESTRICTED = {
 var DEF = {
   logoData: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzk5NjNBIiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSI1MCIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iNDIiIGZvbnQtZmFtaWx5PSJzZXJpZiIgZmlsbD0iI0M5OTYzQSIgZm9udC13ZWlnaHQ9IjkwMCI+NTwvdGV4dD48L3N2Zz4=',
   brandName: '馬克伍號影像工作室',
+  introTagline: 'MARK NO.5.STUDIO',
+  introTaglineSize: '1rem',
   heroSubtitle: 'MARK NO.5.STUDIO',
   heroEnTitle: 'MARK NO.5',
   heroZhTitle: '讓影像，真正為品牌帶來價值',
@@ -737,9 +739,10 @@ var D = null, CU = null, CF = 'All', SQ = '', carIdx = 0, carTimer = null, PF_PA
 var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
-// 權限管理項目
-var EDITABLE_ITEMS = ['heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
+// 權限管理項目（包含 introTagline）
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
 var EDITABLE_NAMES = {
+  introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
   introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
   logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',
@@ -826,6 +829,7 @@ function runIntro() {
   var cv = document.getElementById('intro-canvas');
   var logo = document.getElementById('intro-logo-el');
   var tag = document.getElementById('intro-tagline');
+  if (tag && D.introTagline) tag.textContent = D.introTagline;
   if (!ov || !cv) return;
   logo.src = D.logoData;
   var ctx = cv.getContext('2d');
@@ -1065,6 +1069,7 @@ function applyTheme() {
   r.setProperty('--ripple-width', t.rippleWidth || '3px');
   r.setProperty('--intro-logo-size', t.introLogoSize || '300px');
   r.setProperty('--datetime-size', t.datetimeSize || '.78rem');
+  r.setProperty('--intro-tagline-size', D.introTaglineSize || '1rem');
   /* Process number dim */
   var pno = parseFloat(t.procNumOpacity || '0.18');
   var pnho = parseFloat(t.procNumHoverOpacity || '1.0');
@@ -2050,6 +2055,9 @@ window.openBackendSettings = function() {
       
       // === 首頁設定 ===
       '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'MARK NO.5.STUDIO') + '" placeholder="MARK NO.5.STUDIO"></label>' +
+      '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'1rem') + '" placeholder="1rem"></label>' +
+      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：開場動畫中大標題的文字和大小（需重新整理頁面）</small>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">Logo 下方小標 (heroSubtitle)：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標 (heroEnTitle)：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標 (heroZhTitle)：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="讓影像，真正為品牌帶來價值"></label>' +
@@ -2060,7 +2068,7 @@ window.openBackendSettings = function() {
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'200px') + '" placeholder="200px"></label>' +
       '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：網站開啟時的動畫 Logo 大小（如：200px, 300px, 400px）</small>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'.78rem') + '" placeholder=".78rem"></label>' +
-      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem, 1.2rem）</small>' +
+      '<small style="color:var(--t3);display:block;margin-bottom:10px;font-size:.75rem">提示：右上角日期時間天氣的文字大小（如：.78rem, 1rem, 1.2rem），修改後立即生效</small>' +
       '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<select id="bs-hero-en-font" class="swal2-input" style="margin-top:4px">' +
         '<option value="Iansui"' + (t.heroEnFont==='Iansui'?' selected':'') + '>Iansui</option>' +
         '<option value="Bebas Neue"' + (t.heroEnFont==='Bebas Neue'?' selected':'') + '>Bebas Neue</option>' +
@@ -2128,6 +2136,8 @@ window.openBackendSettings = function() {
     preConfirm: function() {
       return {
         // 首頁
+        introTagline: document.getElementById('bs-intro-tagline').value,
+        introTaglineSize: document.getElementById('bs-intro-tagline-size').value,
         heroSubtitle: document.getElementById('bs-hero-subtitle').value,
         heroEnTitle: document.getElementById('bs-hero-en').value,
         heroZhTitle: document.getElementById('bs-hero-zh').value,
@@ -2168,6 +2178,8 @@ window.openBackendSettings = function() {
       var v = result.value;
       
       // 更新首頁設定
+      D.introTagline = v.introTagline;
+      D.introTaglineSize = v.introTaglineSize;
       D.heroSubtitle = v.heroSubtitle;
       D.heroEnTitle = v.heroEnTitle;
       D.heroZhTitle = v.heroZhTitle;
