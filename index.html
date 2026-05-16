@@ -1418,6 +1418,99 @@ function getYTId(url) {
   return m ? m[1] : (url.length === 11 ? url : '');
 }
 
+/* Portfolio drag and drop */
+var draggedItem = null;
+var draggedIndex = -1;
+
+function handleDragStart(e) {
+  draggedItem = this;
+  draggedIndex = parseInt(this.dataset.index);
+  this.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+  if (e.preventDefault) e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleDragEnter(e) {
+  if (this !== draggedItem) {
+    this.style.borderTop = '3px solid var(--gold)';
+  }
+}
+
+function handleDragLeave(e) {
+  this.style.borderTop = '';
+}
+
+function handleDrop(e) {
+  if (e.stopPropagation) e.stopPropagation();
+  this.style.borderTop = '';
+  
+  if (draggedItem !== this && draggedIndex !== -1) {
+    var dropIndex = parseInt(this.dataset.index);
+    
+    // 交換 D.portfolio 陣列中的順序
+    var temp = D.portfolio[draggedIndex];
+    D.portfolio[draggedIndex] = D.portfolio[dropIndex];
+    D.portfolio[dropIndex] = temp;
+    
+    persist();
+    renderPF();
+  }
+  
+  return false;
+}
+
+function handleDragEnd(e) {
+  this.style.opacity = '1';
+  var items = document.querySelectorAll('.pf-item');
+  items.forEach(function(item) {
+    item.style.borderTop = '';
+  });
+}
+
+// 在登入後為作品集項目添加拖曳事件
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('dragstart', function(e) {
+    if (e.target.classList.contains('pf-item') && CU) {
+      handleDragStart.call(e.target, e);
+    }
+  });
+  
+  document.addEventListener('dragover', function(e) {
+    if (e.target.closest('.pf-item') && CU) {
+      handleDragOver.call(e.target.closest('.pf-item'), e);
+    }
+  });
+  
+  document.addEventListener('dragenter', function(e) {
+    if (e.target.closest('.pf-item') && CU) {
+      handleDragEnter.call(e.target.closest('.pf-item'), e);
+    }
+  });
+  
+  document.addEventListener('dragleave', function(e) {
+    if (e.target.closest('.pf-item') && CU) {
+      handleDragLeave.call(e.target.closest('.pf-item'), e);
+    }
+  });
+  
+  document.addEventListener('drop', function(e) {
+    if (e.target.closest('.pf-item') && CU) {
+      handleDrop.call(e.target.closest('.pf-item'), e);
+    }
+  });
+  
+  document.addEventListener('dragend', function(e) {
+    if (e.target.classList.contains('pf-item') && CU) {
+      handleDragEnd.call(e.target, e);
+    }
+  });
+});
+
 function renderPF() {
   var c = document.getElementById('portfolio-list'), f = document.getElementById('pf-filters');
   var paginationDiv = document.getElementById('pf-pagination');
@@ -1462,7 +1555,7 @@ function renderPF() {
     var idx = D.portfolio.indexOf(item);
     var thumb = 'https://img.youtube.com/vi/' + vid + '/hqdefault.jpg';
     var isVertical = item.cat === '短影音';
-    html += '<div class="pf-item' + (isVertical ? ' pf-item-vertical' : '') + '" data-vid="' + vid + '" onmouseenter="startHoverPreview(this)" onmouseleave="stopHoverPreview(this)">';
+    html += '<div class="pf-item' + (isVertical ? ' pf-item-vertical' : '') + '" data-vid="' + vid + '" data-index="' + idx + '" onmouseenter="startHoverPreview(this)" onmouseleave="stopHoverPreview(this)">';
     html += '<div class="pf-admin-btns' + (CU ? ' show' : '') + '">';
     html += '<button class="pf-admin-btn" onclick="event.stopPropagation();editPortfolio(' + idx + ')"><i class="fa-solid fa-pen fa-xs"></i></button>';
     html += '<button class="pf-admin-btn del" onclick="event.stopPropagation();delPortfolio(' + idx + ')"><i class="fa-solid fa-trash fa-xs"></i></button>';
@@ -1508,6 +1601,17 @@ function renderPF() {
     paginationDiv.innerHTML = pagHtml;
   } else if (paginationDiv) {
     paginationDiv.innerHTML = '';
+  }
+  
+  // 啟用拖曳排序（只有登入用戶）
+  if (CU) {
+    setTimeout(function() {
+      var items = document.querySelectorAll('.pf-item');
+      items.forEach(function(item) {
+        item.setAttribute('draggable', 'true');
+        item.style.cursor = 'move';
+      });
+    }, 100);
   }
 }
 
