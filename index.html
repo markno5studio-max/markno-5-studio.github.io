@@ -167,10 +167,11 @@ nav a:hover{color:var(--gold)}nav a:hover::after{width:100%}
 .pf-item{background:var(--bg2);display:block;position:relative;overflow:hidden;transition:transform .35s}
 .pf-item:not(.playing):hover{transform:scale(1.01);z-index:2}
 .pf-thumb-wrap{position:relative;padding-bottom:56.25%;overflow:hidden;background:var(--bg3);cursor:pointer}
-.pf-item-vertical{max-width:31.64%}
-.pf-item-vertical .pf-thumb-wrap{padding-bottom:177.78%}
+.pf-item-vertical .pf-thumb-wrap{padding-bottom:56.25%}
+.pf-item-vertical .pf-thumb{width:31.64%;left:50%;transform:translateX(-50%)}
 .pf-thumb{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .7s ease,opacity .5s}
 .pf-item:not(.playing):hover .pf-thumb{transform:scale(1.06)}
+.pf-item-vertical:not(.playing):hover .pf-thumb{transform:translateX(-50%)}
 .pf-overlay{position:absolute;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;transition:all .3s}
 .pf-item:not(.playing):hover .pf-overlay{background:rgba(0,0,0,.18)}
 .pf-play-icon{font-size:3.4rem;color:rgba(255,255,255,.85);transition:all .3s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
@@ -401,16 +402,6 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .video-modal-close{top:-45px;font-size:1.5rem;width:45px;height:45px}
 }
 
-.portfolio-item.vertical {
-  aspect-ratio: 9/16;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.portfolio-item.vertical iframe {
-  width: 100%;
-  height: 100%;
-}
 </style>
 </head>
 <body>
@@ -660,7 +651,7 @@ var DEF = {
   label01: '01 · THE STORY', label02: '02 · WHAT WE DO', label03: '03 · HOW WE WORK',
   label04: '04 · SELECTED WORKS', label05: '05 · GET IN TOUCH',
   aboutHeading: '關於馬克伍號',
-  aboutDesc: '馬克伍號影像工作室創立至今八年，負責人擁有 19 年影像製作經驗，從產業最核心的後期製作出發，逐步橫跨完整影像製作領域，累積深厚且紮實的專業基礎。',
+  aboutDesc: '馬克伍號影像工作室，由 馬克斯（Marcus） 創立。 19 年影像製作經驗，從電視產業後期出發， 穿越節目製作、商業廣告與視覺設計領域。\n這不是單一技術的累積， 而是一種對影像語言的長時間觀察與理解。\n我們理解畫面如何說話， 也理解觀眾如何感受。',
   aboutTitle: '打造卓越視覺的<span style="color:var(--gold)">專業影像夥伴</span>',
   readyDesc: '我們的起點，來自於早期參與知名電視節目後期製作，在高強度製作環境中，磨練出對節奏、敘事與細節的極致要求。隨著經驗累積，逐步拓展至：<ul><li>節目製作與內容企劃</li><li>商業廣告與品牌形象影片</li><li>動畫設計與視覺特效（VFX / Motion Graphics）</li><li>數位內容與新媒體影像整合</li></ul><p style="margin-top:10px;font-size:.88rem;color:var(--t3)">這些歷程，不只是技術的累積，更是對影像語言與市場溝通方式的深度理解。</p>',
   readyTitle: '"Ready." 準備好，創造價值',
@@ -1164,20 +1155,13 @@ function canEdit(key) {
   // 超級執行長：可編輯所有欄位
   if (CU.role === 'super_admin') return true;
   
-  // 營運長：不能編輯首頁標題、品牌名、主要標籤
-  if (CU.role === 'ops_admin') {
-    if (OPS_ADMIN_RESTRICTED[key]) return false;
-    return true; // 其他欄位都可以編輯
+  // 營運長和優秀人員：都必須檢查自定義權限
+  // 只有超級執行長勾選的項目才能編輯
+  if (CU.permissions && CU.permissions.length > 0) {
+    return CU.permissions.indexOf(key) !== -1;
   }
   
-  // 優秀人員：檢查自定義權限
-  if (CU.role === 'editor') {
-    if (CU.permissions && CU.permissions.length > 0) {
-      return CU.permissions.indexOf(key) !== -1;
-    }
-    return !!EDITOR_KEYS[key];
-  }
-  
+  // 如果沒有自定義權限，則無法編輯任何項目
   return false;
 }
 
@@ -1257,18 +1241,6 @@ function renderFooterCopy() {
   var heroSub = document.querySelector('.hero-subtitle, #hero-subtitle');
   if (heroSub && D.heroSubtitle) {
     heroSub.textContent = D.heroSubtitle;
-  }
-
-  // 更新首頁英文大標
-  var heroEn = document.querySelector('.hero-en-title, #hero-en-title');
-  if (heroEn && D.heroEnTitle) {
-    heroEn.textContent = D.heroEnTitle;
-  }
-  
-  // 更新首頁中文副標
-  var heroZh = document.querySelector('.hero-zh-title, #hero-zh-title');
-  if (heroZh && D.heroZhTitle) {
-    heroZh.textContent = D.heroZhTitle;
   }
 }
 
@@ -2104,22 +2076,22 @@ window.openBackendSettings = function() {
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>';
       
       if (isSuperAdmin || canEdit('introTagline')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">1. 開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
       }
       if (isSuperAdmin || canEdit('introTaglineSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">2. 開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>';
       }
       if (isSuperAdmin || canEdit('heroSubtitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">Logo 下方小標：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">3. Logo 下方小標：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
       }
       if (isSuperAdmin || canEdit('heroEnTitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">4. 英文大標：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>';
       }
       if (isSuperAdmin || canEdit('heroZhTitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="馬克伍號影像工作室"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">5. 中文副標：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="馬克伍號影像工作室"></label>';
       }
       if (isSuperAdmin || canEdit('heroDesc')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">6. 首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
       }
       
       // 外觀設定
@@ -2127,22 +2099,69 @@ window.openBackendSettings = function() {
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>';
       
       if (isSuperAdmin || canEdit('introLogoSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">7. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
       }
       if (isSuperAdmin || canEdit('datetimeSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">8. 日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
       }
       if (isSuperAdmin || canEdit('datetimeFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">9. 日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
       }
       if (isSuperAdmin || canEdit('heroEnFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">10. 英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
       }
       if (isSuperAdmin || canEdit('heroEnSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">11. 英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
       }
       if (isSuperAdmin || canEdit('heroZhSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">12. 中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
+      }
+      
+      // Logo 設定
+      if (isSuperAdmin || canEdit('logo')) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔄 27. Logo 設定</h3>';
+        h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:10px">目前 Logo：</p>';
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
+        h += '<img src="' + (D.logoData || '') + '" style="width:60px;height:60px;border-radius:50%;border:2px solid var(--gold)">';
+        h += '<button onclick="changeLogo()" class="swal2-confirm swal2-styled" style="margin:0">上傳新 Logo</button>';
+        h += '</div>';
+        h += '<small style="color:var(--t3);font-size:.75rem">提示：Logo 會顯示在網站左上角（38x38px）和開場動畫</small>';
+      }
+      
+      // 輪播設定
+      if (isSuperAdmin || canEdit('carousel')) {
+        var carouselHtml = '';
+        if (D.carousel && D.carousel.length > 0) {
+          carouselHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">';
+          for (var i = 0; i < D.carousel.length; i++) {
+            carouselHtml += '<img src="' + D.carousel[i] + '" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">';
+          }
+          carouselHtml += '</div>';
+        } else {
+          carouselHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未上傳輪播圖片</div>';
+        }
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🖼 28. 輪播設定</h3>';
+        h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前輪播圖片（' + (D.carousel ? D.carousel.length : 0) + ' 張）：</p>';
+        h += carouselHtml;
+        h += '<button onclick="manageCarousel()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理輪播圖片</button>';
+      }
+      
+      // 分類設定
+      if (isSuperAdmin || canEdit('categories')) {
+        var categoriesHtml = '';
+        if (D.pfCategories && D.pfCategories.length > 0) {
+          categoriesHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
+          for (var i = 0; i < D.pfCategories.length; i++) {
+            categoriesHtml += '<span style="padding:4px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;font-size:.8rem">' + D.pfCategories[i] + '</span>';
+          }
+          categoriesHtml += '</div>';
+        } else {
+          categoriesHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未設定作品分類</div>';
+        }
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏷 29. 分類設定</h3>';
+        h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前作品分類（' + (D.pfCategories ? D.pfCategories.length : 0) + ' 個）：</p>';
+        h += categoriesHtml;
+        h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
       }
       
       // 社群連結
@@ -2150,19 +2169,19 @@ window.openBackendSettings = function() {
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>';
       
       if (isSuperAdmin || canEdit('socialFacebook')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">13. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialInstagram')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">14. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialThreads')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">15. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialYoutube')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">16. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialLine')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">17. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       
       // 光暈設定
@@ -2170,16 +2189,16 @@ window.openBackendSettings = function() {
       if (hasRipplePermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">18. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">19. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">20. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">21. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
       
@@ -2188,10 +2207,10 @@ window.openBackendSettings = function() {
       if (hasProcPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>';
         if (isSuperAdmin || canEdit('procNumOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">22. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
         }
         if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
         }
       }
       
@@ -2201,13 +2220,13 @@ window.openBackendSettings = function() {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
       }
       
@@ -2399,27 +2418,11 @@ window.openBackendSettings = function() {
       if (v.lineId !== undefined) D.social.lineId = v.lineId;
       if (v.lineShow !== undefined) D.social.lineShow = v.lineShow;
       
-      // 更新光暈設定
-      if (v.rippleColor !== undefined) D.theme.rippleColor = v.rippleColor;
-      if (v.rippleOpacity !== undefined) D.theme.rippleOpacity = v.rippleOpacity;
-      if (v.rippleSize !== undefined) D.theme.rippleSize = v.rippleSize;
-      if (v.rippleWidth !== undefined) D.theme.rippleWidth = v.rippleWidth;
-      
-      // 更新流程數字
-      if (v.procNumOpacity !== undefined) D.theme.procNumOpacity = v.procNumOpacity;
-      if (v.procNumHoverOpacity !== undefined) D.theme.procNumHoverOpacity = v.procNumHoverOpacity;
-      
       // 更新系統設定
       if (!D.backendSettings) D.backendSettings = {};
       if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
-      
-      // 更新 backendSettings
-      if (!D.backendSettings) D.backendSettings = {};
-      D.backendSettings.autoLogoutMinutes = v.autoLogoutMinutes;
-      D.backendSettings.copyrightTemplate = v.copyrightTemplate;
-      D.backendSettings.sendMessageEmail = v.sendMessageEmail;
       
       logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings']);
       persist();
@@ -2579,15 +2582,10 @@ window.showUsers = function() {
             '<input id="eu-nm" class="swal2-input" value="' + u.name + '" placeholder="顯示名稱">' +
             '<input id="eu-un" class="swal2-input" value="' + u.username + '" placeholder="帳號">' +
             '<input id="eu-pw" type="password" class="swal2-input" placeholder="新密碼（留空不變）">' +
-            '<select id="eu-ro" class="swal2-input">' +
-              '<option value="editor"' + (u.role==='editor'?' selected':'') + '>一般編輯</option>' +
-              '<option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option>' +
-              '<option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option>' +
-            '</select>' +
+
             (CU.role === 'super_admin' ? '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>' : ''),
       showCancelButton: true, confirmButtonText: '儲存',
       didOpen: function() {
-        addEnterKeyHandler();
         if (CU.role === 'super_admin') {
           var permList = document.getElementById('perm-list');
           if (permList) {
@@ -2597,7 +2595,7 @@ window.showUsers = function() {
               var itemId = EDITABLE_ITEMS[j];
               var itemName = EDITABLE_NAMES[itemId] || itemId;
               var checked = uPerms.indexOf(itemId) >= 0 ? ' checked' : '';
-              html += '<label style="display:block;margin-bottom:6px;font-size:.85rem;cursor:pointer"><input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + itemName + '</label>';
+              html += '<label style="display:block;margin-bottom:6px;font-size:.85rem;cursor:pointer"><input type="checkbox" class="perm-cb" value="' + itemId + '"' + checked + '> ' + (j + 1) + '. ' + itemName + '</label>';
             }
             permList.innerHTML = html;
           }
@@ -2607,7 +2605,7 @@ window.showUsers = function() {
         var nm = document.getElementById('eu-nm').value.trim();
         var un = document.getElementById('eu-un').value.trim();
         var pw = document.getElementById('eu-pw').value;
-        var role = document.getElementById('eu-ro').value;
+        var role = u.role; // 角色不可修改
         if (!nm || !un) { Swal.showValidationMessage('名稱和帳號必填'); return false; }
         var permissions = [];
         var cbs = document.querySelectorAll('.perm-cb:checked');
