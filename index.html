@@ -1600,7 +1600,7 @@ window.editPortfolio = function(idx) {
     html: '<input id="pu" class="swal2-input" value="' + (item.url||'') + '" placeholder="YouTube 完整網址">' +
           '<input id="pt" class="swal2-input" value="' + (item.title||'') + '" placeholder="作品標題">' +
           '<select id="pc" class="swal2-input">' + catOpts + '</select>' +
-          '<input id="pc2" class="swal2-input" placeholder="自訂分類名稱" style="display:none;margin-top:4px">' +
+          '<input id="pc2" class="swal2-input" placeholder="自訂分類名稱" style="display:none;margin:4px auto 0">' +
           '<textarea id="pd" class="swal2-textarea" placeholder="說明">' + (item.description||'') + '</textarea>',
     didOpen: function() {
       document.getElementById('pc').onchange = function() {
