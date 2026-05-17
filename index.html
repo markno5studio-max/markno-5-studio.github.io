@@ -745,7 +745,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -754,7 +754,7 @@ var EDITABLE_NAMES = {
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
-  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email'
+  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email'
 };
 
 /* ============================================================
@@ -1243,7 +1243,37 @@ function updateDOM() {
   renderSocial();
   renderFooterSocial();
   renderPF();
+  renderServices();
   updateAdminUI();
+}
+
+// 根據作品分類自動生成服務項目
+function renderServices() {
+  var container = document.querySelector('.services-grid');
+  if (!container) return;
+  
+  var categories = D.pfCategories || [];
+  if (categories.length === 0) return;
+  
+  var icons = {
+    '品牌形象廣告': 'fa-solid fa-camera',
+    '企業形象廣告': 'fa-solid fa-clapperboard',
+    '音樂錄影帶': 'fa-solid fa-music',
+    '活動紀錄': 'fa-solid fa-calendar-check',
+    '動畫製作': 'fa-regular fa-lightbulb',
+    '短影音': 'fa-solid fa-mobile-screen-button',
+    '商業廣告': 'fa-regular fa-building'
+  };
+  
+  var html = '';
+  for (var i = 0; i < categories.length; i++) {
+    var cat = categories[i];
+    var icon = icons[cat] || 'fa-solid fa-film';
+    html += '<div class="service-card reveal"><div class="svc-icon"><i class="' + icon + '"></i></div>';
+    html += '<div class="svc-body"><h3>' + cat + '</h3><p>專業' + cat + '製作服務</p></div></div>';
+  }
+  
+  container.innerHTML = html;
 }
 
 function renderFooterCopy() {
@@ -1435,7 +1465,8 @@ function getYTId(url) {
 /* Portfolio drag and drop */
 var draggedItem = null;
 var draggedIndex = -1;
-var autoScrollInterval = null;
+var autoScrollTimer = null;
+var lastScrollDirection = null;
 
 function handleDragStart(e) {
   draggedItem = this;
@@ -1453,23 +1484,40 @@ function handleDragOver(e) {
   var mouseX = e.clientX;
   var edgeThreshold = 100; // 邊緣觸發區域 100px
   
-  // 清除之前的計時器
-  if (autoScrollInterval) {
-    clearInterval(autoScrollInterval);
-    autoScrollInterval = null;
-  }
+  var totalPages = Math.ceil(D.portfolio.length / PF_PER_PAGE);
+  var direction = null;
   
   // 滑鼠在右邊緣 - 下一頁
-  if (mouseX > viewportWidth - edgeThreshold && PF_PAGE < Math.ceil((D.portfolio.length) / PF_PER_PAGE) - 1) {
-    autoScrollInterval = setInterval(function() {
-      goToPage(PF_PAGE + 1);
-    }, 800);
+  if (mouseX > viewportWidth - edgeThreshold && PF_PAGE < totalPages - 1) {
+    direction = 'next';
   }
   // 滑鼠在左邊緣 - 上一頁
   else if (mouseX < edgeThreshold && PF_PAGE > 0) {
-    autoScrollInterval = setInterval(function() {
-      goToPage(PF_PAGE - 1);
-    }, 800);
+    direction = 'prev';
+  }
+  
+  // 如果方向改變或第一次觸發，設置新的計時器
+  if (direction && direction !== lastScrollDirection) {
+    if (autoScrollTimer) {
+      clearTimeout(autoScrollTimer);
+    }
+    
+    lastScrollDirection = direction;
+    autoScrollTimer = setTimeout(function() {
+      if (direction === 'next') {
+        goToPage(PF_PAGE + 1);
+      } else if (direction === 'prev') {
+        goToPage(PF_PAGE - 1);
+      }
+      autoScrollTimer = null;
+      lastScrollDirection = null;
+    }, 500); // 0.5 秒後翻頁
+  }
+  // 如果離開邊緣，清除計時器
+  else if (!direction && autoScrollTimer) {
+    clearTimeout(autoScrollTimer);
+    autoScrollTimer = null;
+    lastScrollDirection = null;
   }
   
   return false;
@@ -1490,9 +1538,10 @@ function handleDrop(e) {
   this.style.borderTop = '';
   
   // 清除翻頁計時器
-  if (autoScrollInterval) {
-    clearInterval(autoScrollInterval);
-    autoScrollInterval = null;
+  if (autoScrollTimer) {
+    clearTimeout(autoScrollTimer);
+    autoScrollTimer = null;
+    lastScrollDirection = null;
   }
   
   if (draggedItem !== this && draggedIndex !== -1) {
@@ -1519,9 +1568,10 @@ function handleDragEnd(e) {
   });
   
   // 清除翻頁計時器
-  if (autoScrollInterval) {
-    clearInterval(autoScrollInterval);
-    autoScrollInterval = null;
+  if (autoScrollTimer) {
+    clearTimeout(autoScrollTimer);
+    autoScrollTimer = null;
+    lastScrollDirection = null;
   }
 }
 
@@ -2411,6 +2461,9 @@ window.openBackendSettings = function() {
         if (isSuperAdmin || canEdit('email')) {
           h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
+        if (isSuperAdmin || canEdit('contactEmail')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+        }
       }
       
       h += '</div>';
@@ -2558,6 +2611,10 @@ window.openBackendSettings = function() {
         var el = document.getElementById('bs-send-email');
         if (el) v.email = el.value;
       }
+      if (isSuperAdmin || canEdit('contactEmail')) {
+        var el = document.getElementById('bs-contact-email');
+        if (el) v.contactEmail = el.value;
+      }
       
       return v;
     }
@@ -2606,8 +2663,9 @@ window.openBackendSettings = function() {
       if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
+      if (v.contactEmail !== undefined) D.contactEmail = v.contactEmail;
       
-      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings']);
+      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
       persist();
       applyTheme();
       updateDOM();
@@ -2646,8 +2704,9 @@ window.showInbox = function() {
     
     for (var i = messages.length - 1; i >= 0; i--) {
       var msg = messages[i];
+      var unreadDot = msg.read ? '' : '<span style="display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;margin-right:8px"></span>';
       html += '<tr style="border-bottom:1px solid var(--border-dim)">';
-      html += '<td style="padding:12px 8px;font-size:.8rem;color:var(--t3)">' + (msg.time || '') + '</td>';
+      html += '<td style="padding:12px 8px;font-size:.8rem;color:var(--t3)">' + unreadDot + (msg.time || '') + '</td>';
       html += '<td style="padding:12px 8px;font-size:.85rem">' + (msg.email || '') + '</td>';
       html += '<td style="padding:12px 8px;font-size:.85rem">' + (msg.subject || '') + '</td>';
       html += '<td style="padding:12px 8px"><button onclick="replyMessage(' + i + ')" class="swal2-confirm swal2-styled" style="margin:0;padding:6px 12px;font-size:.8rem">回覆</button></td>';
