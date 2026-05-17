@@ -502,13 +502,6 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
   <h2 class="section-heading reveal" data-key="servicesHeading"></h2>
   <p class="section-sub reveal" data-key="servicesSub"></p>
   <div class="services-grid stagger">
-    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-camera"></i></div><div class="svc-body"><h3 data-key="svc1Title"></h3><p data-key="svc1Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-clapperboard"></i></div><div class="svc-body"><h3 data-key="svc2Title"></h3><p data-key="svc2Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-regular fa-building"></i></div><div class="svc-body"><h3 data-key="svc3Title"></h3><p data-key="svc3Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-regular fa-lightbulb"></i></div><div class="svc-body"><h3 data-key="svc4Title"></h3><p data-key="svc4Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-calendar-check"></i></div><div class="svc-body"><h3 data-key="svc5Title"></h3><p data-key="svc5Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-music"></i></div><div class="svc-body"><h3 data-key="svc6Title"></h3><p data-key="svc6Desc"></p></div></div>
-    <div class="service-card"><div class="svc-icon"><i class="fa-solid fa-mobile-screen-button"></i></div><div class="svc-body"><h3 data-key="svc7Title"></h3><p data-key="svc7Desc"></p></div></div>
   </div>
 </section>
 
@@ -585,7 +578,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     </div>
     <div class="footer-col"><h4>快速連結</h4><ul><li><a href="#about">關於我們</a></li><li><a href="#services">專業服務</a></li><li><a href="#process">服務流程</a></li><li><a href="#portfolio">精選作品</a></li></ul></div>
     <div class="footer-col"><h4>服務項目</h4><ul id="footer-services"></ul></div>
-    <div class="footer-col"><h4>聯絡資訊</h4><div class="foot-contact"><p><i class="fa-regular fa-envelope" style="color:var(--gold);margin-right:6px"></i><a id="footer-email" href="#"></a></p><p id="ready-text" style="margin-top:14px;color:var(--t3);font-size:.8rem;line-height:1.7" data-key="readyText"></p></div></div>
+    <div class="footer-col"><h4>聯絡資訊</h4><div class="foot-contact"><p><i class="fa-regular fa-envelope" style="color:var(--gold);margin-right:6px"></i><a id="footer-email" href="#"></a></p><p id="ready-text" style="margin-top:14px;color:var(--t3);font-size:.8rem;line-height:1.7" data-key="readyText" data-type="html"></p></div></div>
   </div>
   <div class="footer-bottom">
     <div>
@@ -762,7 +755,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -772,7 +765,7 @@ var EDITABLE_NAMES = {
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
-  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email'
+  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
 
 /* ============================================================
