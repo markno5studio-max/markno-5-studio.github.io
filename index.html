@@ -708,13 +708,13 @@ var DEF = {
   },
   pfCategories: ['品牌形象廣告','企業形象廣告','募資影片','活動紀錄','短影音','音樂錄影帶','動畫製作'],
   serviceDescriptions: {
-    '品牌形象廣告': { description: '專業品牌形象廣告製作服務', show: true },
-    '企業形象廣告': { description: '專業企業形象廣告製作服務', show: true },
-    '募資影片': { description: '專業募資影片製作服務', show: true },
-    '活動紀錄': { description: '專業活動紀錄製作服務', show: true },
-    '短影音': { description: '專業短影音製作服務', show: true },
-    '音樂錄影帶': { description: '專業音樂錄影帶製作服務', show: true },
-    '動畫製作': { description: '專業動畫製作製作服務', show: true }
+    '品牌形象廣告': { description: '專業品牌形象廣告製作服務', show: true, icon: 'fa-solid fa-camera' },
+    '企業形象廣告': { description: '專業企業形象廣告製作服務', show: true, icon: 'fa-solid fa-clapperboard' },
+    '募資影片': { description: '專業募資影片製作服務', show: true, icon: 'fa-solid fa-film' },
+    '活動紀錄': { description: '專業活動紀錄製作服務', show: true, icon: 'fa-solid fa-calendar-check' },
+    '短影音': { description: '專業短影音製作服務', show: true, icon: 'fa-solid fa-mobile-screen-button' },
+    '音樂錄影帶': { description: '專業音樂錄影帶製作服務', show: true, icon: 'fa-solid fa-music' },
+    '動畫製作': { description: '專業動畫製作製作服務', show: true, icon: 'fa-regular fa-lightbulb' }
   },
   formChecklist: ['拍攝影片','後期剪輯','動畫製作','4K 規格','HD 規格','直式影片','橫式影片','影片長度討論','2D 動畫','3D 動畫','燈光設備','專業收音','讀稿機','特殊需求'],
   carouselImages: [
@@ -1100,22 +1100,51 @@ function persist() {
   }
   catch(e) { 
     if (e.name === 'QuotaExceededError') {
-      Swal.fire({ 
-        title:'儲存空間不足', 
-        html:'localStorage 已達上限。系統已自動清理舊資料，請重試儲存。<br><small>提示：已清理編輯記錄和舊分析資料</small>',
-        icon:'warning'
-      });
+      console.log('儲存空間不足，開始清理...');
       
-      // 強制清理更多資料後重試
+      // 第一次清理：減少 editLog 和 inbox
       D.editLog = D.editLog ? D.editLog.slice(0, 20) : [];
       D.inbox = D.inbox ? D.inbox.slice(0, 50) : [];
       if (D.analytics) D.analytics.byDate = {};
       
       try {
         localStorage.setItem(KEY, JSON.stringify(D));
+        console.log('清理後儲存成功');
+        return; // 儲存成功，直接返回
       } catch(e2) {
-        Swal.fire({ title:'儲存失敗', text:'即使清理資料後仍無法儲存，請聯繫管理員', icon:'error' });
+        console.log('第一次清理後仍失敗，進行深度清理...');
+        
+        // 第二次清理：更激進
+        D.editLog = [];
+        D.inbox = [];
+        if (D.analytics) {
+          D.analytics.byDate = {};
+          D.analytics.byDevice = {};
+          D.analytics.bySource = {};
+        }
+        
+        try {
+          localStorage.setItem(KEY, JSON.stringify(D));
+          console.log('深度清理後儲存成功');
+          Swal.fire({ 
+            title:'✅ 已儲存', 
+            html:'系統已清理舊資料以騰出空間',
+            timer: 2000,
+            icon:'success'
+          });
+          return;
+        } catch(e3) {
+          console.error('深度清理後仍失敗:', e3);
+          Swal.fire({ 
+            title:'儲存失敗', 
+            html:'資料量過大無法儲存。<br>建議：<br>1. 減少作品集數量<br>2. 清除瀏覽器快取後重試', 
+            icon:'error' 
+          });
+        }
       }
+    } else {
+      console.error('persist 發生其他錯誤:', e);
+      Swal.fire({ title:'儲存錯誤', text: e.message, icon:'error' });
     }
   }
 }
@@ -1379,24 +1408,43 @@ function renderServices() {
     
     // 檢查是否要顯示此服務項目
     var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
-    var shouldShow = true;
+    var shouldShow = true; // 預設顯示
     var desc = '專業' + cat + '製作服務';
     
     if (svcData) {
-      // 新格式：{ description: '...', show: true }
+      // 新格式：{ description: '...', show: true/false }
       if (typeof svcData === 'object') {
-        shouldShow = svcData.show !== false;
+        shouldShow = svcData.show !== false; // 只有明確設為 false 才不顯示
         desc = svcData.description || desc;
       } else {
-        // 舊格式：字串
+        // 舊格式：字串（預設顯示）
         desc = svcData;
+        shouldShow = true;
       }
     }
+    // 如果沒有 svcData，代表是新分類，預設顯示
     
     if (!shouldShow) continue; // 跳過不顯示的項目
     
+    // 取得 icon
     var icon = icons[cat] || 'fa-solid fa-film';
-    html += '<div class="service-card reveal"><div class="svc-icon"><i class="' + icon + '"></i></div>';
+    var iconHtml = '';
+    
+    if (svcData && typeof svcData === 'object' && svcData.icon) {
+      // 如果有自訂 icon
+      if (svcData.icon.startsWith('data:image') || svcData.icon.startsWith('http')) {
+        // 圖片格式
+        iconHtml = '<img src="' + svcData.icon + '" style="width:100%;height:100%;object-fit:contain">';
+      } else {
+        // Font Awesome class
+        icon = svcData.icon;
+        iconHtml = '<i class="' + icon + '"></i>';
+      }
+    } else {
+      iconHtml = '<i class="' + icon + '"></i>';
+    }
+    
+    html += '<div class="service-card reveal"><div class="svc-icon">' + iconHtml + '</div>';
     html += '<div class="svc-body"><h3>' + cat + '</h3><p>' + desc + '</p></div></div>';
   }
   
@@ -1409,10 +1457,10 @@ function renderServices() {
     for (var i = 0; i < categories.length; i++) {
       var cat = categories[i];
       var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
-      var shouldShow = true;
+      var shouldShow = true; // 預設顯示
       
       if (svcData && typeof svcData === 'object') {
-        shouldShow = svcData.show !== false;
+        shouldShow = svcData.show !== false; // 只有明確設為 false 才不顯示
       }
       
       if (shouldShow) {
@@ -2109,6 +2157,49 @@ window.manageCarousel = function() {
 /* ============================================================
    SERVICE DESCRIPTIONS EDITOR
    ============================================================ */
+window.previewServiceIcon = function(idx) {
+  var fileInput = document.getElementById('svc-icon-' + idx);
+  var preview = document.getElementById('svc-icon-preview-' + idx);
+  var img = document.getElementById('svc-icon-img-' + idx);
+  
+  if (fileInput.files && fileInput.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      img.src = e.target.result;
+      img.style.display = 'block';
+      
+      // 添加刪除按鈕（如果還沒有）
+      var existingBtn = preview.querySelector('button');
+      if (!existingBtn) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.onclick = function() { deleteServiceIcon(idx); };
+        btn.style.cssText = 'position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:#B52020;color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0';
+        btn.textContent = '×';
+        preview.appendChild(btn);
+      }
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  }
+};
+
+window.deleteServiceIcon = function(idx) {
+  var fileInput = document.getElementById('svc-icon-' + idx);
+  var preview = document.getElementById('svc-icon-preview-' + idx);
+  var img = document.getElementById('svc-icon-img-' + idx);
+  
+  // 清除檔案選擇
+  fileInput.value = '';
+  
+  // 隱藏圖片
+  img.style.display = 'none';
+  img.src = '';
+  
+  // 移除刪除按鈕
+  var btn = preview.querySelector('button');
+  if (btn) btn.remove();
+};
+
 window.editServiceDescriptions = function() {
   var categories = D.pfCategories || [];
   if (categories.length === 0) {
@@ -2116,30 +2207,47 @@ window.editServiceDescriptions = function() {
     return;
   }
   
-  var html = '<div style="max-height:400px;overflow-y:auto">';
+  var html = '<div style="max-height:500px;overflow-y:auto">';
   for (var i = 0; i < categories.length; i++) {
     var cat = categories[i];
     var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
     var desc = '專業' + cat + '製作服務';
     var show = true;
+    var icon = '';
     
     if (svcData) {
       if (typeof svcData === 'object') {
         desc = svcData.description || desc;
         show = svcData.show !== false;
+        icon = svcData.icon || '';
       } else {
         desc = svcData;
       }
     }
     
-    html += '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:start">';
-    html += '<label style="flex:1">';
-    html += '<strong style="display:block;margin-bottom:4px;font-size:.85rem;color:var(--gold)">' + cat + '：</strong>';
-    html += '<input id="svc-desc-' + i + '" class="swal2-input" style="margin:0" value="' + desc + '" placeholder="服務說明">';
-    html += '</label>';
-    html += '<label style="white-space:nowrap;padding-top:30px">';
+    var num = (i + 1);
+    html += '<div style="border:1px solid var(--border);padding:12px;margin-bottom:12px;border-radius:4px">';
+    html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">';
+    html += '<strong style="color:var(--gold);font-size:.9rem">' + num + '. ' + cat + '</strong>';
+    html += '<label style="margin-left:auto;white-space:nowrap">';
     html += '<input type="checkbox" id="svc-show-' + i + '"' + (show ? ' checked' : '') + '> 顯示';
     html += '</label>';
+    html += '</div>';
+    
+    html += '<input id="svc-desc-' + i + '" class="swal2-input" style="margin-bottom:8px" value="' + desc + '" placeholder="服務說明">';
+    
+    html += '<div style="display:flex;gap:8px;align-items:center">';
+    html += '<input type="file" id="svc-icon-' + i + '" accept="image/*" onchange="previewServiceIcon(' + i + ')" style="font-size:.8rem;flex:1">';
+    html += '<div id="svc-icon-preview-' + i + '" style="position:relative">';
+    if (icon && (icon.startsWith('data:image') || icon.startsWith('http'))) {
+      html += '<img id="svc-icon-img-' + i + '" src="' + icon + '" style="width:80px;height:80px;object-fit:contain;border:1px solid var(--border);border-radius:4px;display:block">';
+      html += '<button type="button" onclick="deleteServiceIcon(' + i + ')" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:#B52020;color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>';
+    } else {
+      html += '<img id="svc-icon-img-' + i + '" style="width:80px;height:80px;object-fit:contain;border:1px solid var(--border);border-radius:4px;display:none">';
+    }
+    html += '</div>';
+    html += '</div>';
+    html += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-top:4px">上傳圖示（選填，不上傳則使用預設圖標）</small>';
     html += '</div>';
   }
   html += '</div>';
@@ -2147,28 +2255,83 @@ window.editServiceDescriptions = function() {
   Swal.fire({
     title: '編輯服務項目說明',
     html: html,
-    width: 600,
+    width: 700,
     confirmButtonText: '💾 儲存',
     showCancelButton: true,
     cancelButtonText: '取消',
     preConfirm: function() {
-      var descriptions = {};
+      var promises = [];
+      
       for (var i = 0; i < categories.length; i++) {
-        var descEl = document.getElementById('svc-desc-' + i);
-        var showEl = document.getElementById('svc-show-' + i);
-        if (descEl && showEl) {
-          descriptions[categories[i]] = {
-            description: descEl.value.trim() || ('專業' + categories[i] + '製作服務'),
-            show: showEl.checked
-          };
-        }
+        (function(idx) {
+          var descEl = document.getElementById('svc-desc-' + idx);
+          var showEl = document.getElementById('svc-show-' + idx);
+          var iconFile = document.getElementById('svc-icon-' + idx).files[0];
+          var cat = categories[idx];
+          var oldIcon = '';
+          
+          if (D.serviceDescriptions && D.serviceDescriptions[cat] && typeof D.serviceDescriptions[cat] === 'object') {
+            oldIcon = D.serviceDescriptions[cat].icon || '';
+          }
+          
+          if (iconFile) {
+            // 有上傳新圖示
+            var promise = new Promise(function(resolve) {
+              var reader = new FileReader();
+              reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() {
+                  var canvas = document.createElement('canvas');
+                  var size = 120;
+                  canvas.width = canvas.height = size;
+                  var ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, size, size);
+                  resolve({
+                    cat: cat,
+                    description: descEl.value.trim() || ('專業' + cat + '製作服務'),
+                    show: showEl.checked,
+                    icon: canvas.toDataURL('image/png', 0.9)
+                  });
+                };
+                img.src = e.target.result;
+              };
+              reader.readAsDataURL(iconFile);
+            });
+            promises.push(promise);
+          } else {
+            // 沒有上傳新檔案
+            var imgEl = document.getElementById('svc-icon-img-' + idx);
+            var useOldIcon = oldIcon;
+            
+            // 如果圖片被隱藏（刪除後），清空 icon 使用預設
+            if (imgEl && imgEl.style.display === 'none') {
+              useOldIcon = '';
+            }
+            
+            promises.push(Promise.resolve({
+              cat: cat,
+              description: descEl.value.trim() || ('專業' + cat + '製作服務'),
+              show: showEl.checked,
+              icon: useOldIcon
+            }));
+          }
+        })(i);
       }
-      return descriptions;
+      
+      return Promise.all(promises);
     }
   }).then(function(result) {
-    if (result.isConfirmed) {
+    if (result.isConfirmed && result.value) {
       if (!D.serviceDescriptions) D.serviceDescriptions = {};
-      D.serviceDescriptions = result.value;
+      
+      result.value.forEach(function(item) {
+        D.serviceDescriptions[item.cat] = {
+          description: item.description,
+          show: item.show,
+          icon: item.icon
+        };
+      });
+      
       persist();
       renderServices();
       Swal.fire({title:'✅ 已儲存！',text:'服務項目說明已更新',timer:1500,showConfirmButton:false,icon:'success'});
