@@ -474,6 +474,18 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
   <div class="scroll-cue"><span id="scroll-label">SCROLL</span><div class="scroll-line"></div></div>
 </section>
 
+<!-- 最新公告跑馬燈 -->
+<div id="news-marquee" style="background:var(--marquee-bg,#C9963A);padding:12px 0;overflow:hidden;position:relative">
+  <div id="news-marquee-content" style="display:flex;white-space:nowrap;animation:marquee 30s linear infinite">
+  </div>
+</div>
+<style>
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+</style>
+
 <section id="about" class="section">
   <div class="section-label reveal" data-key="label01"></div>
   <h2 class="section-heading reveal" data-key="aboutHeading"></h2>
@@ -572,8 +584,8 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
       <div class="footer-social" id="footer-social"></div>
     </div>
     <div class="footer-col"><h4>快速連結</h4><ul><li><a href="#about">關於我們</a></li><li><a href="#services">專業服務</a></li><li><a href="#process">服務流程</a></li><li><a href="#portfolio">精選作品</a></li></ul></div>
-    <div class="footer-col"><h4>服務項目</h4><ul><li><a href="#services">動態影像拍攝</a></li><li><a href="#services">商業廣告製作</a></li><li><a href="#services">企業形象影片</a></li><li><a href="#services">活動紀錄</a></li><li><a href="#services">音樂錄影帶</a></li><li><a href="#services">短影音製作</a></li></ul></div>
-    <div class="footer-col"><h4>聯絡資訊</h4><div class="foot-contact"><p><i class="fa-regular fa-envelope" style="color:var(--gold);margin-right:6px"></i><a id="footer-email" href="#"></a></p><p style="margin-top:14px;color:var(--t3);font-size:.8rem;font-style:italic;line-height:1.7">準備好了嗎？<br>讓我們一起創造<br>令人難忘的視覺作品。</p></div></div>
+    <div class="footer-col"><h4>服務項目</h4><ul id="footer-services"></ul></div>
+    <div class="footer-col"><h4>聯絡資訊</h4><div class="foot-contact"><p><i class="fa-regular fa-envelope" style="color:var(--gold);margin-right:6px"></i><a id="footer-email" href="#"></a></p><p id="ready-text" style="margin-top:14px;color:var(--t3);font-size:.8rem;font-style:italic;line-height:1.7" data-key="readyText"></p></div></div>
   </div>
   <div class="footer-bottom">
     <div>
@@ -646,6 +658,8 @@ var DEF = {
   brandName: '馬克伍號影像工作室',
   introTagline: 'MARK NO.5.STUDIO',
   introTaglineSize: '1rem',
+  marqueeItems: ['🎬 歡迎光臨馬克伍號影像工作室', '✨ 專業影像製作服務', '📹 打造令人難忘的視覺作品'],
+  marqueeColor: '#FFFFFF',
   heroSubtitle: 'MARK NO.5.STUDIO',
   heroEnTitle: 'MARK NO.5',
   heroZhTitle: '讓影像，真正為品牌帶來價值',
@@ -682,6 +696,7 @@ var DEF = {
   formNote: '送出後將開啟您的郵件軟體，請確認內容後寄出。我們通常在 24 小時內回覆。',
   pfLabelUrl: 'YouTube 連結', pfLabelTitle: '標題', pfLabelCat: '分類', pfLabelDesc: '說明',
   footerTagline: '我們不追求過度表現，\n而是精準。\n不堆疊效果，\n而是選擇。\n不只是完成影像，\n而是讓影像成立。',
+  readyText: '準備好了嗎？<br>讓我們一起創造<br>令人難忘的視覺作品。',
   footerCompany: '馬克伍號影像工作室．統一編號：82150195',
   footerCopyTpl: '© 2017–{YEAR} All Rights Reserved.',
   social: { 
@@ -745,10 +760,11 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
+  marqueeItems:'最新公告內容',marqueeColor:'跑馬顏色',
   introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
   logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
@@ -1244,7 +1260,31 @@ function updateDOM() {
   renderFooterSocial();
   renderPF();
   renderServices();
+  renderMarquee();
   updateAdminUI();
+}
+
+// 渲染跑馬燈
+function renderMarquee() {
+  var container = document.getElementById('news-marquee-content');
+  if (!container) return;
+  
+  var items = D.marqueeItems || [];
+  if (items.length === 0) {
+    document.getElementById('news-marquee').style.display = 'none';
+    return;
+  }
+  
+  document.getElementById('news-marquee').style.display = 'block';
+  
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    html += '<span style="margin:0 60px;color:' + (D.marqueeColor || '#FFFFFF') + ';font-size:.9rem;font-weight:500">' + items[i] + '</span>';
+  }
+  // 重複一次讓跑馬無縫循環
+  html += html;
+  
+  container.innerHTML = html;
 }
 
 // 根據作品分類自動生成服務項目
@@ -1274,6 +1314,16 @@ function renderServices() {
   }
   
   container.innerHTML = html;
+  
+  // 同時更新尾頁服務項目
+  var footerServices = document.getElementById('footer-services');
+  if (footerServices) {
+    var footerHtml = '';
+    for (var i = 0; i < categories.length; i++) {
+      footerHtml += '<li><a href="#services">' + categories[i] + '</a></li>';
+    }
+    footerServices.innerHTML = footerHtml;
+  }
 }
 
 function renderFooterCopy() {
@@ -1496,7 +1546,7 @@ function handleDragOver(e) {
     direction = 'prev';
   }
   
-  // 如果方向改變或第一次觸發，設置新的計時器
+  // 如果方向改變，清除舊計時器並設置新的
   if (direction && direction !== lastScrollDirection) {
     if (autoScrollTimer) {
       clearTimeout(autoScrollTimer);
@@ -1505,18 +1555,22 @@ function handleDragOver(e) {
     lastScrollDirection = direction;
     autoScrollTimer = setTimeout(function() {
       if (direction === 'next') {
-        goToPage(PF_PAGE + 1);
+        PF_PAGE++;
       } else if (direction === 'prev') {
-        goToPage(PF_PAGE - 1);
+        PF_PAGE--;
       }
+      renderPF();
+      document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
       autoScrollTimer = null;
       lastScrollDirection = null;
-    }, 500); // 0.5 秒後翻頁
+    }, 800); // 0.8 秒後翻頁
   }
   // 如果離開邊緣，清除計時器
-  else if (!direction && autoScrollTimer) {
-    clearTimeout(autoScrollTimer);
-    autoScrollTimer = null;
+  else if (!direction && lastScrollDirection) {
+    if (autoScrollTimer) {
+      clearTimeout(autoScrollTimer);
+      autoScrollTimer = null;
+    }
     lastScrollDirection = null;
   }
   
@@ -2327,32 +2381,44 @@ window.openBackendSettings = function() {
         h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">6. 首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
       }
       
+      // 最新公告跑馬燈
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📢 最新公告</h3>';
+      
+      if (isSuperAdmin || canEdit('marqueeItems')) {
+        var marqueeList = (D.marqueeItems || []).join('\n');
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">7. 公告內容：<textarea id="bs-marquee-items" class="swal2-textarea" style="margin-top:4px;min-height:80px" placeholder="每行一則公告（支援 emoji）">' + marqueeList + '</textarea></label>';
+        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：每行一則公告，可使用 emoji</small>';
+      }
+      if (isSuperAdmin || canEdit('marqueeColor')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">8. 跑馬文字顏色：<input id="bs-marquee-color" type="color" class="swal2-input" style="margin-top:4px;width:100px;height:40px" value="' + (D.marqueeColor||'#FFFFFF') + '"></label>';
+      }
+      
       // 外觀設定
       var t = D.theme || {};
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>';
       
       if (isSuperAdmin || canEdit('introLogoSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">7. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">9. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
       }
       if (isSuperAdmin || canEdit('datetimeSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">8. 日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">10. 日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
       }
       if (isSuperAdmin || canEdit('datetimeFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">9. 日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">11. 日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
       }
       if (isSuperAdmin || canEdit('heroEnFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">10. 英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">12. 英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
       }
       if (isSuperAdmin || canEdit('heroEnSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">11. 英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">13. 英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
       }
       if (isSuperAdmin || canEdit('heroZhSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">12. 中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">14. 中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
       }
       
       // Logo 設定
       if (isSuperAdmin || canEdit('logo')) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔄 27. Logo 設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔄 29. Logo 設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:10px">目前 Logo：</p>';
         h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
         h += '<img src="' + (D.logoData || '') + '" style="width:60px;height:60px;border-radius:50%;border:2px solid var(--gold)">';
@@ -2373,7 +2439,7 @@ window.openBackendSettings = function() {
         } else {
           carouselHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未上傳輪播圖片</div>';
         }
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🖼 28. 輪播設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🖼 30. 輪播設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前輪播圖片（' + (D.carousel ? D.carousel.length : 0) + ' 張）：</p>';
         h += carouselHtml;
         h += '<button onclick="manageCarousel()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理輪播圖片</button>';
@@ -2391,7 +2457,7 @@ window.openBackendSettings = function() {
         } else {
           categoriesHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未設定作品分類</div>';
         }
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏷 29. 分類設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏷 31. 分類設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前作品分類（' + (D.pfCategories ? D.pfCategories.length : 0) + ' 個）：</p>';
         h += categoriesHtml;
         h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
@@ -2422,16 +2488,16 @@ window.openBackendSettings = function() {
       if (hasRipplePermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">18. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">20. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">19. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">21. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">20. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">22. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">21. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
       
@@ -2440,10 +2506,10 @@ window.openBackendSettings = function() {
       if (hasProcPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>';
         if (isSuperAdmin || canEdit('procNumOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">22. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
         }
         if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
         }
       }
       
@@ -2453,16 +2519,16 @@ window.openBackendSettings = function() {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
         if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">32. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
         }
       }
       
@@ -2514,6 +2580,14 @@ window.openBackendSettings = function() {
       if (isSuperAdmin || canEdit('heroDesc')) {
         var el = document.getElementById('bs-hero-desc');
         if (el) v.heroDesc = el.value;
+      }
+      if (isSuperAdmin || canEdit('marqueeItems')) {
+        var el = document.getElementById('bs-marquee-items');
+        if (el) v.marqueeItems = el.value.split('\n').filter(function(x) { return x.trim(); });
+      }
+      if (isSuperAdmin || canEdit('marqueeColor')) {
+        var el = document.getElementById('bs-marquee-color');
+        if (el) v.marqueeColor = el.value;
       }
       if (isSuperAdmin || canEdit('introLogoSize')) {
         var el = document.getElementById('bs-intro-logo-size');
@@ -2629,6 +2703,8 @@ window.openBackendSettings = function() {
       if (v.heroEnTitle !== undefined) D.heroEnTitle = v.heroEnTitle;
       D.heroZhTitle = v.heroZhTitle;
       D.heroDesc = v.heroDesc;
+      if (v.marqueeItems !== undefined) D.marqueeItems = v.marqueeItems;
+      if (v.marqueeColor !== undefined) D.marqueeColor = v.marqueeColor;
       
       // 更新 theme
       if (!D.theme) D.theme = {};
