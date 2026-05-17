@@ -408,7 +408,8 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 
 <div id="intro-overlay">
   <canvas id="intro-canvas"></canvas>
-  <img id="intro-logo-el" src="" alt="">
+  <img id="intro-logo-el" src="" alt="" style="display:none">
+  <video id="intro-logo-video" src="" autoplay loop muted playsinline style="display:none;position:absolute;width:var(--intro-logo-size,300px);height:var(--intro-logo-size,300px);border-radius:50%;object-fit:cover;opacity:0;transform:scale(1.06);z-index:3;filter:blur(6px)"></video>
   <div id="intro-tagline">MARK NO.5.STUDIO</div>
 </div>
 
@@ -641,6 +642,7 @@ var OPS_ADMIN_RESTRICTED = {
 
 var DEF = {
   logoData: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzk5NjNBIiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSI1MCIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iNDIiIGZvbnQtZmFtaWx5PSJzZXJpZiIgZmlsbD0iI0M5OTYzQSIgZm9udC13ZWlnaHQ9IjkwMCI+NTwvdGV4dD48L3N2Zz4=',
+  logoType: 'image',
   brandName: '馬克伍號影像工作室',
   introTagline: 'MARK NO.5.STUDIO',
   introTaglineSize: '1rem',
@@ -831,10 +833,22 @@ function runIntro() {
   var ov = document.getElementById('intro-overlay');
   var cv = document.getElementById('intro-canvas');
   var logo = document.getElementById('intro-logo-el');
+  var logoVideo = document.getElementById('intro-logo-video');
   var tag = document.getElementById('intro-tagline');
   if (tag && D.introTagline) tag.textContent = D.introTagline;
   if (!ov || !cv) return;
-  logo.src = D.logoData;
+  
+  // 判斷是影片還是圖片
+  if (D.logoType === 'video' && logoVideo) {
+    logoVideo.src = D.logoData;
+    logoVideo.style.display = 'block';
+    logo.style.display = 'none';
+  } else {
+    logo.src = D.logoData;
+    logo.style.display = 'block';
+    if (logoVideo) logoVideo.style.display = 'none';
+  }
+  
   var ctx = cv.getContext('2d');
   var W, H;
   function sz() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
@@ -1421,6 +1435,7 @@ function getYTId(url) {
 /* Portfolio drag and drop */
 var draggedItem = null;
 var draggedIndex = -1;
+var autoScrollInterval = null;
 
 function handleDragStart(e) {
   draggedItem = this;
@@ -1432,6 +1447,31 @@ function handleDragStart(e) {
 function handleDragOver(e) {
   if (e.preventDefault) e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
+  
+  // 檢查滑鼠位置，自動翻頁
+  var viewportWidth = window.innerWidth;
+  var mouseX = e.clientX;
+  var edgeThreshold = 100; // 邊緣觸發區域 100px
+  
+  // 清除之前的計時器
+  if (autoScrollInterval) {
+    clearInterval(autoScrollInterval);
+    autoScrollInterval = null;
+  }
+  
+  // 滑鼠在右邊緣 - 下一頁
+  if (mouseX > viewportWidth - edgeThreshold && PF_PAGE < Math.ceil((D.portfolio.length) / PF_PER_PAGE) - 1) {
+    autoScrollInterval = setInterval(function() {
+      goToPage(PF_PAGE + 1);
+    }, 800);
+  }
+  // 滑鼠在左邊緣 - 上一頁
+  else if (mouseX < edgeThreshold && PF_PAGE > 0) {
+    autoScrollInterval = setInterval(function() {
+      goToPage(PF_PAGE - 1);
+    }, 800);
+  }
+  
   return false;
 }
 
@@ -1448,6 +1488,12 @@ function handleDragLeave(e) {
 function handleDrop(e) {
   if (e.stopPropagation) e.stopPropagation();
   this.style.borderTop = '';
+  
+  // 清除翻頁計時器
+  if (autoScrollInterval) {
+    clearInterval(autoScrollInterval);
+    autoScrollInterval = null;
+  }
   
   if (draggedItem !== this && draggedIndex !== -1) {
     var dropIndex = parseInt(this.dataset.index);
@@ -1471,6 +1517,12 @@ function handleDragEnd(e) {
   items.forEach(function(item) {
     item.style.borderTop = '';
   });
+  
+  // 清除翻頁計時器
+  if (autoScrollInterval) {
+    clearInterval(autoScrollInterval);
+    autoScrollInterval = null;
+  }
 }
 
 // 在登入後為作品集項目添加拖曳事件
@@ -1859,26 +1911,52 @@ window.manageCarousel = function() {
 window.changeLogo = function() {
   Swal.fire({
     title: '🔄 更換 Logo',
-    html: '<input type="file" id="lf" class="swal2-file" accept="image/*"><p style="margin-top:8px;font-size:.78rem;color:var(--t3)">建議方形圖，系統自動壓縮。</p>',
+    html: '<input type="file" id="lf" class="swal2-file" accept="image/*,video/mp4,video/quicktime">' +
+          '<p style="margin-top:8px;font-size:.78rem;color:var(--t3)">支援圖片（PNG/JPG）或影片（MP4/MOV）</p>' +
+          '<p style="font-size:.78rem;color:var(--t3)">圖片建議方形，解析度 800x800 以上</p>',
     confirmButtonText: '上傳', showCancelButton: true,
     preConfirm: function() {
-      var file = document.getElementById('lf').files[0]; if (!file) return null;
+      var file = document.getElementById('lf').files[0]; 
+      if (!file) return null;
+      
+      // 檢查是否為影片
+      if (file.type.startsWith('video/')) {
+        return new Promise(function(res) {
+          var rdr = new FileReader();
+          rdr.onload = function(e) {
+            res({ type: 'video', data: e.target.result });
+          };
+          rdr.readAsDataURL(file);
+        });
+      }
+      
+      // 圖片處理 - 提高解析度到 800x800
       return new Promise(function(res) {
         var rdr = new FileReader();
         rdr.onload = function(e) {
           var img = new Image();
           img.onload = function() {
-            var cv = document.createElement('canvas'); cv.width = cv.height = 200;
+            var cv = document.createElement('canvas'); 
+            cv.width = cv.height = 800; // 提高解析度
             var s = Math.min(img.width, img.height);
-            cv.getContext('2d').drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 200, 200);
-            res(cv.toDataURL('image/jpeg', 0.78));
+            var ctx = cv.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 800, 800);
+            res({ type: 'image', data: cv.toDataURL('image/png', 0.95) }); // 使用 PNG 和更高品質
           };
           img.src = e.target.result;
         };
         rdr.readAsDataURL(file);
       });
     }
-  }).then(function(r) { if (r.value) { D.logoData = r.value; saveChanges(false); } });
+  }).then(function(r) { 
+    if (r.value) { 
+      D.logoData = r.value.data;
+      D.logoType = r.value.type; // 記錄類型
+      saveChanges(false); 
+    } 
+  });
 };
 
 /* ============================================================
