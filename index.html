@@ -707,6 +707,15 @@ var DEF = {
     lineShow: true
   },
   pfCategories: ['品牌形象廣告','企業形象廣告','募資影片','活動紀錄','短影音','音樂錄影帶','動畫製作'],
+  serviceDescriptions: {
+    '品牌形象廣告': '專業品牌形象廣告製作服務',
+    '企業形象廣告': '專業企業形象廣告製作服務',
+    '募資影片': '專業募資影片製作服務',
+    '活動紀錄': '專業活動紀錄製作服務',
+    '短影音': '專業短影音製作服務',
+    '音樂錄影帶': '專業音樂錄影帶製作服務',
+    '動畫製作': '專業動畫製作製作服務'
+  },
   formChecklist: ['拍攝影片','後期剪輯','動畫製作','4K 規格','HD 規格','直式影片','橫式影片','影片長度討論','2D 動畫','3D 動畫','燈光設備','專業收音','讀稿機','特殊需求'],
   carouselImages: [
     'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1800&q=80',
@@ -731,6 +740,7 @@ var DEF = {
   },
   backendSettings: {
     autoLogoutMinutes: 5, // 預設 5 分鐘後自動登出
+    autoSaveSeconds: 60, // 預設 60 秒靜置後自動儲存
     copyrightTemplate: '',
     sendMessageEmail: '',
     inboxGmailUrl: ''
@@ -755,7 +765,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','copyright','email','contactEmail','readyText'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','autoSave','copyright','email','contactEmail','readyText','serviceDescriptions'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -765,7 +775,7 @@ var EDITABLE_NAMES = {
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
-  autoLogout:'自動登出時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
+  autoLogout:'自動登出時間',autoSave:'靜置自動儲存',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字',serviceDescriptions:'服務說明'
 };
 
 /* ============================================================
@@ -1047,9 +1057,10 @@ function loadData() {
   }
   try { var cu = sessionStorage.getItem('mk5cu'); if (cu) CU = JSON.parse(cu); } catch(e) {}
   
-  // 如果已登入，啟動自動登出計時器
+  // 如果已登入，啟動自動登出計時器和自動儲存
   if (CU) {
     startAutoLogout();
+    startAutoSave();
   }
 }
 
@@ -1315,8 +1326,9 @@ function renderServices() {
   for (var i = 0; i < categories.length; i++) {
     var cat = categories[i];
     var icon = icons[cat] || 'fa-solid fa-film';
+    var desc = (D.serviceDescriptions && D.serviceDescriptions[cat]) || ('專業' + cat + '製作服務');
     html += '<div class="service-card reveal"><div class="svc-icon"><i class="' + icon + '"></i></div>';
-    html += '<div class="svc-body"><h3>' + cat + '</h3><p>專業' + cat + '製作服務</p></div></div>';
+    html += '<div class="svc-body"><h3>' + cat + '</h3><p>' + desc + '</p></div></div>';
   }
   
   container.innerHTML = html;
@@ -2260,6 +2272,7 @@ window.showLoginModal = function() {
         if (ui >= 0) { D.users[ui].online = true; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
         sessionStorage.setItem('mk5cu', JSON.stringify(CU)); persist(); updateDOM();
         startAutoLogout(); // 啟動自動登出計時器
+        startAutoSave(); // 啟動靜置自動儲存
         Swal.fire({ title: '歡迎，' + found.name + '！', timer: 1200, showConfirmButton: false, icon: 'success' });
       } else Swal.fire({ title: '帳號或密碼錯誤', icon: 'error' });
     }
@@ -2302,6 +2315,47 @@ function resetAutoLogout() {
     startAutoLogout(); // 重新開始計時
   }
 }
+
+/* ============================================================
+   AUTO SAVE
+   ============================================================ */
+var autoSaveTimer = null;
+var lastActivityTime = Date.now();
+
+function startAutoSave() {
+  clearAutoSave();
+  
+  if (!CU) return;
+  
+  var seconds = (D.backendSettings && D.backendSettings.autoSaveSeconds) || 60;
+  var milliseconds = seconds * 1000;
+  
+  autoSaveTimer = setTimeout(function() {
+    var idleTime = Date.now() - lastActivityTime;
+    if (idleTime >= milliseconds && CU) {
+      saveChanges(false); // 自動儲存（不顯示提示）
+      console.log('自動儲存完成（靜置 ' + seconds + ' 秒）');
+    }
+    startAutoSave(); // 重新開始計時
+  }, milliseconds);
+}
+
+function clearAutoSave() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
+function resetActivityTimer() {
+  lastActivityTime = Date.now();
+}
+
+// 監聽用戶活動
+document.addEventListener('keydown', resetActivityTimer);
+document.addEventListener('click', resetActivityTimer);
+document.addEventListener('mousemove', resetActivityTimer);
+
 
 /* ============================================================
    LOGOUT
@@ -2476,6 +2530,17 @@ window.openBackendSettings = function() {
         h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
       }
       
+      // 服務說明設定
+      if (isSuperAdmin || canEdit('serviceDescriptions')) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📝 34. 服務說明設定</h3>';
+        var cats = D.pfCategories || [];
+        for (var ci = 0; ci < cats.length; ci++) {
+          var cat = cats[ci];
+          var desc = (D.serviceDescriptions && D.serviceDescriptions[cat]) || ('專業' + cat + '製作服務');
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">' + cat + '：<input id="bs-svc-desc-' + ci + '" class="swal2-input" style="margin-top:4px" value="' + desc + '" data-category="' + cat + '"></label>';
+        }
+      }
+      
       // 社群連結
       var social = D.social || {};
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>';
@@ -2534,14 +2599,18 @@ window.openBackendSettings = function() {
         if (isSuperAdmin || canEdit('autoLogout')) {
           h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
+        if (isSuperAdmin || canEdit('autoSave')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 靜置自動儲存（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="300" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
+          h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定</small>';
+        }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
         if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">34. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">35. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
         }
       }
       
@@ -2698,6 +2767,10 @@ window.openBackendSettings = function() {
         var el = document.getElementById('bs-auto-logout');
         if (el) v.autoLogout = el.value;
       }
+      if (isSuperAdmin || canEdit('autoSave')) {
+        var el = document.getElementById('bs-auto-save');
+        if (el) v.autoSave = el.value;
+      }
       if (isSuperAdmin || canEdit('copyright')) {
         var el = document.getElementById('bs-copyright');
         if (el) v.copyright = el.value;
@@ -2709,6 +2782,20 @@ window.openBackendSettings = function() {
       if (isSuperAdmin || canEdit('contactEmail')) {
         var el = document.getElementById('bs-contact-email');
         if (el) v.contactEmail = el.value;
+      }
+      
+      // 收集服務說明
+      if (isSuperAdmin || canEdit('serviceDescriptions')) {
+        var cats = D.pfCategories || [];
+        var descs = {};
+        for (var ci = 0; ci < cats.length; ci++) {
+          var el = document.getElementById('bs-svc-desc-' + ci);
+          if (el) {
+            var cat = el.getAttribute('data-category');
+            descs[cat] = el.value;
+          }
+        }
+        v.serviceDescriptions = descs;
       }
       
       return v;
@@ -2760,11 +2847,13 @@ window.openBackendSettings = function() {
       // 更新系統設定
       if (!D.backendSettings) D.backendSettings = {};
       if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
+      if (v.autoSave !== undefined) D.backendSettings.autoSaveSeconds = parseInt(v.autoSave);
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
       if (v.contactEmail !== undefined) D.contactEmail = v.contactEmail;
+      if (v.serviceDescriptions !== undefined) D.serviceDescriptions = v.serviceDescriptions;
       
-      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
+      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail','serviceDescriptions']);
       persist();
       applyTheme();
       updateDOM();
