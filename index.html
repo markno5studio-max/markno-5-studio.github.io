@@ -708,13 +708,13 @@ var DEF = {
   },
   pfCategories: ['品牌形象廣告','企業形象廣告','募資影片','活動紀錄','短影音','音樂錄影帶','動畫製作'],
   serviceDescriptions: {
-    '品牌形象廣告': '專業品牌形象廣告製作服務',
-    '企業形象廣告': '專業企業形象廣告製作服務',
-    '募資影片': '專業募資影片製作服務',
-    '活動紀錄': '專業活動紀錄製作服務',
-    '短影音': '專業短影音製作服務',
-    '音樂錄影帶': '專業音樂錄影帶製作服務',
-    '動畫製作': '專業動畫製作製作服務'
+    '品牌形象廣告': { description: '專業品牌形象廣告製作服務', show: true },
+    '企業形象廣告': { description: '專業企業形象廣告製作服務', show: true },
+    '募資影片': { description: '專業募資影片製作服務', show: true },
+    '活動紀錄': { description: '專業活動紀錄製作服務', show: true },
+    '短影音': { description: '專業短影音製作服務', show: true },
+    '音樂錄影帶': { description: '專業音樂錄影帶製作服務', show: true },
+    '動畫製作': { description: '專業動畫製作製作服務', show: true }
   },
   formChecklist: ['拍攝影片','後期剪輯','動畫製作','4K 規格','HD 規格','直式影片','橫式影片','影片長度討論','2D 動畫','3D 動畫','燈光設備','專業收音','讀稿機','特殊需求'],
   carouselImages: [
@@ -740,7 +740,7 @@ var DEF = {
   },
   backendSettings: {
     autoLogoutMinutes: 5, // 預設 5 分鐘後自動登出
-    autoSaveSeconds: 60, // 預設 60 秒靜置後自動儲存
+    autoSaveSeconds: 60, // 預設 60 秒後自動儲存
     copyrightTemplate: '',
     sendMessageEmail: '',
     inboxGmailUrl: ''
@@ -765,17 +765,17 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','autoSave','copyright','email','contactEmail','readyText','serviceDescriptions'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
   marqueeItems:'最新公告內容',marqueeColor:'跑馬文字顏色',marqueeSpeed:'跑馬速度',marqueeShow:'顯示跑馬燈',
   introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
-  logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',
+  logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',serviceDescriptions:'服務項目說明',
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
-  autoLogout:'自動登出時間',autoSave:'靜置自動儲存',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字',serviceDescriptions:'服務說明'
+  autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
 
 /* ============================================================
@@ -1057,16 +1057,67 @@ function loadData() {
   }
   try { var cu = sessionStorage.getItem('mk5cu'); if (cu) CU = JSON.parse(cu); } catch(e) {}
   
-  // 如果已登入，啟動自動登出計時器和自動儲存
+  // 如果已登入，啟動自動登出計時器
   if (CU) {
-    startAutoLogout();
-    startAutoSave();
+    startAutoLogout(); startAutoSave();
   }
 }
 
 function persist() {
-  try { localStorage.setItem(KEY, JSON.stringify(D)); }
-  catch(e) { if (e.name === 'QuotaExceededError') Swal.fire({ title:'儲存空間已滿', icon:'error' }); }
+  try {
+    // 建立一個副本用於儲存，避免修改原始資料
+    var dataToSave = JSON.parse(JSON.stringify(D));
+    
+    // 限制 editLog 最多保留 50 筆（原本 100 筆太多）
+    if (dataToSave.editLog && dataToSave.editLog.length > 50) {
+      dataToSave.editLog = dataToSave.editLog.slice(0, 50);
+      D.editLog = dataToSave.editLog; // 同步更新原始資料
+    }
+    
+    // 限制 inbox 最多保留 100 筆
+    if (dataToSave.inbox && dataToSave.inbox.length > 100) {
+      dataToSave.inbox = dataToSave.inbox.slice(0, 100);
+      D.inbox = dataToSave.inbox;
+    }
+    
+    // 清理 analytics 中過舊的資料（只保留最近 90 天）
+    if (dataToSave.analytics && dataToSave.analytics.byDate) {
+      var cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 90);
+      var cutoffStr = cutoffDate.toISOString().split('T')[0];
+      
+      var cleanedByDate = {};
+      for (var date in dataToSave.analytics.byDate) {
+        if (date >= cutoffStr) {
+          cleanedByDate[date] = dataToSave.analytics.byDate[date];
+        }
+      }
+      dataToSave.analytics.byDate = cleanedByDate;
+      D.analytics.byDate = cleanedByDate;
+    }
+    
+    localStorage.setItem(KEY, JSON.stringify(dataToSave));
+  }
+  catch(e) { 
+    if (e.name === 'QuotaExceededError') {
+      Swal.fire({ 
+        title:'儲存空間不足', 
+        html:'localStorage 已達上限。系統已自動清理舊資料，請重試儲存。<br><small>提示：已清理編輯記錄和舊分析資料</small>',
+        icon:'warning'
+      });
+      
+      // 強制清理更多資料後重試
+      D.editLog = D.editLog ? D.editLog.slice(0, 20) : [];
+      D.inbox = D.inbox ? D.inbox.slice(0, 50) : [];
+      if (D.analytics) D.analytics.byDate = {};
+      
+      try {
+        localStorage.setItem(KEY, JSON.stringify(D));
+      } catch(e2) {
+        Swal.fire({ title:'儲存失敗', text:'即使清理資料後仍無法儲存，請聯繫管理員', icon:'error' });
+      }
+    }
+  }
 }
 
 /* ============================================================
@@ -1325,20 +1376,48 @@ function renderServices() {
   var html = '';
   for (var i = 0; i < categories.length; i++) {
     var cat = categories[i];
+    
+    // 檢查是否要顯示此服務項目
+    var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
+    var shouldShow = true;
+    var desc = '專業' + cat + '製作服務';
+    
+    if (svcData) {
+      // 新格式：{ description: '...', show: true }
+      if (typeof svcData === 'object') {
+        shouldShow = svcData.show !== false;
+        desc = svcData.description || desc;
+      } else {
+        // 舊格式：字串
+        desc = svcData;
+      }
+    }
+    
+    if (!shouldShow) continue; // 跳過不顯示的項目
+    
     var icon = icons[cat] || 'fa-solid fa-film';
-    var desc = (D.serviceDescriptions && D.serviceDescriptions[cat]) || ('專業' + cat + '製作服務');
     html += '<div class="service-card reveal"><div class="svc-icon"><i class="' + icon + '"></i></div>';
     html += '<div class="svc-body"><h3>' + cat + '</h3><p>' + desc + '</p></div></div>';
   }
   
   container.innerHTML = html;
   
-  // 同時更新尾頁服務項目
+  // 同時更新尾頁服務項目（也要過濾）
   var footerServices = document.getElementById('footer-services');
   if (footerServices) {
     var footerHtml = '';
     for (var i = 0; i < categories.length; i++) {
-      footerHtml += '<li><a href="#services">' + categories[i] + '</a></li>';
+      var cat = categories[i];
+      var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
+      var shouldShow = true;
+      
+      if (svcData && typeof svcData === 'object') {
+        shouldShow = svcData.show !== false;
+      }
+      
+      if (shouldShow) {
+        footerHtml += '<li><a href="#services">' + cat + '</a></li>';
+      }
     }
     footerServices.innerHTML = footerHtml;
   }
@@ -2028,6 +2107,76 @@ window.manageCarousel = function() {
 };
 
 /* ============================================================
+   SERVICE DESCRIPTIONS EDITOR
+   ============================================================ */
+window.editServiceDescriptions = function() {
+  var categories = D.pfCategories || [];
+  if (categories.length === 0) {
+    Swal.fire('提示', '請先設定作品分類', 'info');
+    return;
+  }
+  
+  var html = '<div style="max-height:400px;overflow-y:auto">';
+  for (var i = 0; i < categories.length; i++) {
+    var cat = categories[i];
+    var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
+    var desc = '專業' + cat + '製作服務';
+    var show = true;
+    
+    if (svcData) {
+      if (typeof svcData === 'object') {
+        desc = svcData.description || desc;
+        show = svcData.show !== false;
+      } else {
+        desc = svcData;
+      }
+    }
+    
+    html += '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:start">';
+    html += '<label style="flex:1">';
+    html += '<strong style="display:block;margin-bottom:4px;font-size:.85rem;color:var(--gold)">' + cat + '：</strong>';
+    html += '<input id="svc-desc-' + i + '" class="swal2-input" style="margin:0" value="' + desc + '" placeholder="服務說明">';
+    html += '</label>';
+    html += '<label style="white-space:nowrap;padding-top:30px">';
+    html += '<input type="checkbox" id="svc-show-' + i + '"' + (show ? ' checked' : '') + '> 顯示';
+    html += '</label>';
+    html += '</div>';
+  }
+  html += '</div>';
+  
+  Swal.fire({
+    title: '編輯服務項目說明',
+    html: html,
+    width: 600,
+    confirmButtonText: '💾 儲存',
+    showCancelButton: true,
+    cancelButtonText: '取消',
+    preConfirm: function() {
+      var descriptions = {};
+      for (var i = 0; i < categories.length; i++) {
+        var descEl = document.getElementById('svc-desc-' + i);
+        var showEl = document.getElementById('svc-show-' + i);
+        if (descEl && showEl) {
+          descriptions[categories[i]] = {
+            description: descEl.value.trim() || ('專業' + categories[i] + '製作服務'),
+            show: showEl.checked
+          };
+        }
+      }
+      return descriptions;
+    }
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      if (!D.serviceDescriptions) D.serviceDescriptions = {};
+      D.serviceDescriptions = result.value;
+      persist();
+      renderServices();
+      Swal.fire({title:'✅ 已儲存！',text:'服務項目說明已更新',timer:1500,showConfirmButton:false,icon:'success'});
+    }
+  });
+};
+
+/* ============================================================
    LOGO
 ============================================================ */
 window.changeLogo = function() {
@@ -2271,8 +2420,7 @@ window.showLoginModal = function() {
         var ui = -1; for (var i = 0; i < D.users.length; i++) if (D.users[i].username === CU.username) { ui = i; break; }
         if (ui >= 0) { D.users[ui].online = true; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
         sessionStorage.setItem('mk5cu', JSON.stringify(CU)); persist(); updateDOM();
-        startAutoLogout(); // 啟動自動登出計時器
-        startAutoSave(); // 啟動靜置自動儲存
+        startAutoLogout(); startAutoSave(); // 啟動自動登出計時器
         Swal.fire({ title: '歡迎，' + found.name + '！', timer: 1200, showConfirmButton: false, icon: 'success' });
       } else Swal.fire({ title: '帳號或密碼錯誤', icon: 'error' });
     }
@@ -2312,31 +2460,26 @@ function clearAutoLogout() {
 
 function resetAutoLogout() {
   if (CU) {
-    startAutoLogout(); // 重新開始計時
+    startAutoLogout(); startAutoSave(); // 重新開始計時
+    startAutoSave(); // 同時重置自動儲存
   }
 }
 
-/* ============================================================
-   AUTO SAVE
-   ============================================================ */
+// 自動儲存功能
 var autoSaveTimer = null;
-var lastActivityTime = Date.now();
 
 function startAutoSave() {
-  clearAutoSave();
+  clearAutoSave(); // 清除舊的計時器
   
-  if (!CU) return;
+  if (!CU) return; // 未登入不需要計時
   
   var seconds = (D.backendSettings && D.backendSettings.autoSaveSeconds) || 60;
   var milliseconds = seconds * 1000;
   
   autoSaveTimer = setTimeout(function() {
-    var idleTime = Date.now() - lastActivityTime;
-    if (idleTime >= milliseconds && CU) {
-      saveChanges(false); // 自動儲存（不顯示提示）
-      console.log('自動儲存完成（靜置 ' + seconds + ' 秒）');
+    if (CU) {
+      saveChanges(true); // true 表示自動儲存，不顯示提示
     }
-    startAutoSave(); // 重新開始計時
   }, milliseconds);
 }
 
@@ -2346,16 +2489,6 @@ function clearAutoSave() {
     autoSaveTimer = null;
   }
 }
-
-function resetActivityTimer() {
-  lastActivityTime = Date.now();
-}
-
-// 監聽用戶活動
-document.addEventListener('keydown', resetActivityTimer);
-document.addEventListener('click', resetActivityTimer);
-document.addEventListener('mousemove', resetActivityTimer);
-
 
 /* ============================================================
    LOGOUT
@@ -2530,15 +2663,9 @@ window.openBackendSettings = function() {
         h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
       }
       
-      // 服務說明設定
       if (isSuperAdmin || canEdit('serviceDescriptions')) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📝 34. 服務說明設定</h3>';
-        var cats = D.pfCategories || [];
-        for (var ci = 0; ci < cats.length; ci++) {
-          var cat = cats[ci];
-          var desc = (D.serviceDescriptions && D.serviceDescriptions[cat]) || ('專業' + cat + '製作服務');
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">' + cat + '：<input id="bs-svc-desc-' + ci + '" class="swal2-input" style="margin-top:4px" value="' + desc + '" data-category="' + cat + '"></label>';
-        }
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📝 34. 服務項目說明</h3>';
+        h += '<button onclick="editServiceDescriptions()" class="swal2-confirm swal2-styled" style="margin-top:10px">編輯服務項目說明</button>';
       }
       
       // 社群連結
@@ -2546,16 +2673,16 @@ window.openBackendSettings = function() {
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>';
       
       if (isSuperAdmin || canEdit('socialFacebook')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">13. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">17. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialInstagram')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">14. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">18. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialThreads')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">15. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">19. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialYoutube')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">16. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">20. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialLine')) {
         h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">17. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
@@ -2566,16 +2693,16 @@ window.openBackendSettings = function() {
       if (hasRipplePermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">22. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
       
@@ -2584,10 +2711,10 @@ window.openBackendSettings = function() {
       if (hasProcPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>';
         if (isSuperAdmin || canEdit('procNumOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
         }
         if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
         }
       }
       
@@ -2597,20 +2724,20 @@ window.openBackendSettings = function() {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">36. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 靜置自動儲存（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="300" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
-          h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定</small>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">37. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
+          h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定（10-600 秒）</small>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">38. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
         if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">35. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
         }
       }
       
@@ -2784,20 +2911,6 @@ window.openBackendSettings = function() {
         if (el) v.contactEmail = el.value;
       }
       
-      // 收集服務說明
-      if (isSuperAdmin || canEdit('serviceDescriptions')) {
-        var cats = D.pfCategories || [];
-        var descs = {};
-        for (var ci = 0; ci < cats.length; ci++) {
-          var el = document.getElementById('bs-svc-desc-' + ci);
-          if (el) {
-            var cat = el.getAttribute('data-category');
-            descs[cat] = el.value;
-          }
-        }
-        v.serviceDescriptions = descs;
-      }
-      
       return v;
     }
   }).then(function(result) {
@@ -2851,15 +2964,17 @@ window.openBackendSettings = function() {
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
       if (v.contactEmail !== undefined) D.contactEmail = v.contactEmail;
-      if (v.serviceDescriptions !== undefined) D.serviceDescriptions = v.serviceDescriptions;
       
-      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail','serviceDescriptions']);
+      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
       persist();
       applyTheme();
       updateDOM();
       
-      // 重新啟動自動登出計時器
-      if (CU) startAutoLogout();
+      // 重新啟動自動登出和自動儲存計時器
+      if (CU) {
+        startAutoLogout(); startAutoSave();
+        startAutoSave();
+      }
       
       Swal.fire({title:'✅ 設定已儲存！',text:'所有後台設定已更新',timer:2000,showConfirmButton:false,icon:'success'});
     }
