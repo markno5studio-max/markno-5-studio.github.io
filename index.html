@@ -157,9 +157,13 @@ nav a:hover{color:var(--gold)}nav a:hover::after{width:100%}
 /* Portfolio */
 .portfolio-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:40px 0 32px}
 .pf-filters{display:flex;gap:8px;flex-wrap:wrap}
+.filter-btn-wrap{position:relative;display:inline-block}
 .filter-btn{padding:6px 20px;background:transparent;border:1px solid var(--border);color:var(--t2);font-family:var(--serif);font-size:.82rem;cursor:pointer;transition:all .25s}
 .filter-btn:hover{border-color:var(--gold);color:var(--gold)}
 .filter-btn.active{background:var(--gold);border-color:var(--gold);color:var(--bg);font-weight:600}
+.filter-del-btn{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:#B52020;color:#fff;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.filter-btn-wrap:hover .filter-del-btn{opacity:1}
+.filter-del-btn:hover{background:#8B0000}
 .pf-search{padding:9px 18px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-family:var(--serif);font-size:.84rem;outline:none;transition:border-color .25s;width:210px}
 .pf-search:focus{border-color:var(--gold)}
 .pf-search::placeholder{color:var(--t2);opacity:.8}
@@ -250,11 +254,12 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .admin-info{font-size:.82rem;color:var(--t2);font-weight:300;flex-shrink:0}
 .admin-info strong{color:var(--gold)}
 .admin-ctrls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.admin-btn{padding:7px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--t2);font-family:var(--serif);font-size:.74rem;cursor:pointer;transition:all .25s;display:none;white-space:nowrap}
+.admin-btn{padding:7px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--t2);font-family:var(--serif);font-size:.74rem;cursor:pointer;transition:all .25s;display:none;white-space:nowrap;position:relative}
 .admin-btn.show{display:inline-flex;align-items:center;gap:4px}
 .admin-btn:hover{border-color:var(--gold);color:var(--gold)}
 .admin-btn.save{background:var(--gold);color:var(--bg);border-color:var(--gold);font-weight:700}
 .admin-btn.logout:hover{border-color:var(--red);color:var(--red)}
+.inbox-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 0 8px rgba(239,68,68,.4)}
 #float-login-btn{position:fixed;bottom:24px;right:24px;z-index:9997;padding:9px 22px;background:var(--bg3);border:1px solid var(--border-g);color:var(--gold);font-family:var(--serif);font-size:.78rem;cursor:pointer;transition:all .25s;display:none}
 #float-login-btn:hover{box-shadow:0 0 16px var(--glow)}
 [contenteditable="true"]{outline:1px dashed rgba(201,150,58,.4);outline-offset:2px;cursor:text;border-radius:2px}
@@ -1247,9 +1252,22 @@ function bindEvents() {
     var phoneStr = ph ? '\n電話：' + ph : '';
     // Save to inbox
     if (!D.inbox) D.inbox = [];
-    D.inbox.unshift({ date: new Date().toLocaleString('zh-TW'), name: nm, email: em, phone: ph, msg: mg, needs: needsArr, times: timeArr, replied: false });
+    D.inbox.unshift({ 
+      date: new Date().toLocaleString('zh-TW'), 
+      time: new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      name: nm, 
+      email: em, 
+      phone: ph, 
+      subject: '影像合作詢問',
+      msg: mg, 
+      needs: needsArr, 
+      times: timeArr, 
+      replied: false,
+      read: false // 新訊息標記為未讀
+    });
     if (D.inbox.length > 200) D.inbox = D.inbox.slice(0, 200);
     persist();
+    updateInboxBadge(); // 更新徽章
     var toAddr = D.mailToAddress || D.contactEmail;
     var sub = encodeURIComponent('【影像合作詢問】來自 ' + nm);
     var bod = encodeURIComponent('姓名：' + nm + '\n信箱：' + em + phoneStr + needsStr + timeStr + '\n\n補充說明：\n' + mg);
@@ -1348,6 +1366,7 @@ function updateDOM() {
   renderServices();
   renderMarquee();
   updateAdminUI();
+  if (CU) updateInboxBadge();
 }
 
 // 渲染跑馬燈
@@ -1708,7 +1727,7 @@ function handleDragOver(e) {
       document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
       autoScrollTimer = null;
       lastScrollDirection = null;
-    }, 200); // 0.2 秒後翻頁
+    }, 100); // 0.1 秒後翻頁（加速）
   }
   // 如果離開邊緣，清除計時器
   else if (!direction && lastScrollDirection) {
@@ -1822,7 +1841,18 @@ function renderPF() {
   var fHtml = '';
   for (var i = 0; i < cats.length; i++) {
     var ct = cats[i];
-    fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct + '\')">' + (ct === 'All' ? '全部' : ct) + '</button>';
+    if (ct === 'All') {
+      // 「全部」按鈕沒有刪除功能
+      fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct + '\')">' + '全部' + '</button>';
+    } else {
+      // 其他分類按鈕添加包裝和刪除鈕
+      fHtml += '<div class="filter-btn-wrap">';
+      fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct.replace(/'/g, "\\'") + '\')">' + ct + '</button>';
+      if (CU) {
+        fHtml += '<button class="filter-del-btn" onclick="event.stopPropagation();deleteCategory(\'' + ct.replace(/'/g, "\\'") + '\')" title="刪除此分類">×</button>';
+      }
+      fHtml += '</div>';
+    }
   }
   f.innerHTML = fHtml;
 
@@ -1993,6 +2023,50 @@ window.closeVid = function(btn) {
 };
 
 window.setFilter = function(ct) { CF = ct; SQ = ''; PF_PAGE = 0; document.getElementById('pf-search').value = ''; renderPF(); };
+
+window.deleteCategory = function(catName) {
+  // 確認刪除
+  Swal.fire({
+    title: '確定刪除分類？',
+    html: '分類：<strong>' + catName + '</strong><br><br>⚠️ 此操作將：<br>• 從分類列表中移除<br>• 該分類的作品不會被刪除<br>• 服務項目說明會被移除',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '確定刪除',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#B52020'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      // 從 pfCategories 中移除
+      var idx = D.pfCategories.indexOf(catName);
+      if (idx !== -1) {
+        D.pfCategories.splice(idx, 1);
+      }
+      
+      // 從 serviceDescriptions 中移除
+      if (D.serviceDescriptions && D.serviceDescriptions[catName]) {
+        delete D.serviceDescriptions[catName];
+      }
+      
+      // 如果當前篩選是這個分類，切換到「全部」
+      if (CF === catName) {
+        CF = 'All';
+      }
+      
+      // 儲存並重新渲染
+      persist();
+      renderPF();
+      renderServices();
+      
+      Swal.fire({
+        title: '✅ 已刪除',
+        text: '分類「' + catName + '」已移除',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  });
+};
 
 window.editPortfolio = function(idx) {
   var item = idx === -1 ? { url:'', title:'', cat:'', description:'' } : D.portfolio[idx];
@@ -3150,6 +3224,45 @@ window.openBackendSettings = function() {
 /* ============================================================
    INBOX / MESSAGES
    ============================================================ */
+/* ============================================================
+   INBOX - UNREAD COUNT
+   ============================================================ */
+function getUnreadCount() {
+  var messages = D.inbox || [];
+  var count = 0;
+  for (var i = 0; i < messages.length; i++) {
+    if (!messages[i].read) count++;
+  }
+  return count;
+}
+
+function updateInboxBadge() {
+  var btn = document.querySelector('.admin-btn[onclick="showInbox()"]');
+  if (!btn) return;
+  
+  var count = getUnreadCount();
+  var existingBadge = btn.querySelector('.inbox-badge');
+  
+  if (count > 0) {
+    var displayCount = count > 100 ? '100' : count.toString();
+    if (existingBadge) {
+      existingBadge.textContent = displayCount;
+    } else {
+      var badge = document.createElement('span');
+      badge.className = 'inbox-badge';
+      badge.textContent = displayCount;
+      btn.appendChild(badge);
+    }
+  } else {
+    if (existingBadge) {
+      existingBadge.remove();
+    }
+  }
+}
+
+/* ============================================================
+   INBOX - SHOW
+   ============================================================ */
 window.showInbox = function() {
   if (!CU) return;
   
@@ -3183,6 +3296,13 @@ window.showInbox = function() {
   }
   
   html += '</div>';
+  
+  // 標記所有訊息為已讀
+  for (var i = 0; i < messages.length; i++) {
+    messages[i].read = true;
+  }
+  persist();
+  updateInboxBadge();
   
   Swal.fire({
     title: '📧 來信統計',
