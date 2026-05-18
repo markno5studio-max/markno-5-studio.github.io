@@ -168,6 +168,10 @@ nav a:hover{color:var(--gold)}nav a:hover::after{width:100%}
 .pf-search:focus{border-color:var(--gold)}
 .pf-search::placeholder{color:var(--t2);opacity:.8}
 .portfolio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:2px;background:var(--border)}
+.drag-arrow{position:fixed;top:50%;transform:translateY(-50%);width:60px;height:80px;display:flex;align-items:center;justify-content:center;color:var(--gold);opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
+.drag-arrow-left{left:20px}
+.drag-arrow-right{right:20px}
+.drag-arrow.show{opacity:0.6}
 .pf-item{background:var(--bg2);display:block;position:relative;overflow:hidden;transition:transform .35s}
 .pf-item:not(.playing):hover{transform:scale(1.01);z-index:2}
 .pf-thumb-wrap{position:relative;padding-bottom:56.25%;overflow:hidden;background:var(--bg3);cursor:pointer}
@@ -533,6 +537,19 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     <div class="pf-filters" id="pf-filters"></div>
     <input type="text" id="pf-search" class="pf-search" placeholder="🔍 搜尋作品">
   </div>
+  
+  <!-- 拖曳翻頁箭頭指示器 -->
+  <div id="drag-arrow-left" class="drag-arrow drag-arrow-left">
+    <svg width="40" height="60" viewBox="0 0 40 60">
+      <polygon points="30,10 10,30 30,50" fill="currentColor"/>
+    </svg>
+  </div>
+  <div id="drag-arrow-right" class="drag-arrow drag-arrow-right">
+    <svg width="40" height="60" viewBox="0 0 40 60">
+      <polygon points="10,10 30,30 10,50" fill="currentColor"/>
+    </svg>
+  </div>
+  
   <div class="portfolio-grid" id="portfolio-list"></div>
   <div class="pf-pagination" id="pf-pagination"></div>
 </section>
@@ -1701,33 +1718,48 @@ function handleDragOver(e) {
   var totalPages = Math.ceil(D.portfolio.length / PF_PER_PAGE);
   var direction = null;
   
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  
   // 滑鼠在右邊緣 - 下一頁
   if (mouseX > viewportWidth - edgeThreshold && PF_PAGE < totalPages - 1) {
     direction = 'next';
+    if (rightArrow) rightArrow.classList.add('show');
+    if (leftArrow) leftArrow.classList.remove('show');
   }
   // 滑鼠在左邊緣 - 上一頁
   else if (mouseX < edgeThreshold && PF_PAGE > 0) {
     direction = 'prev';
+    if (leftArrow) leftArrow.classList.add('show');
+    if (rightArrow) rightArrow.classList.remove('show');
+  }
+  else {
+    // 不在邊緣，隱藏箭頭
+    if (leftArrow) leftArrow.classList.remove('show');
+    if (rightArrow) rightArrow.classList.remove('show');
   }
   
-  // 如果方向改變，清除舊計時器並設置新的
+  // 如果方向改變，立即翻頁
   if (direction && direction !== lastScrollDirection) {
     if (autoScrollTimer) {
       clearTimeout(autoScrollTimer);
     }
     
     lastScrollDirection = direction;
+    
+    // 立即翻頁，不等待
+    if (direction === 'next') {
+      PF_PAGE++;
+    } else if (direction === 'prev') {
+      PF_PAGE--;
+    }
+    renderPF();
+    
+    // 短暫延遲後允許下次翻頁
     autoScrollTimer = setTimeout(function() {
-      if (direction === 'next') {
-        PF_PAGE++;
-      } else if (direction === 'prev') {
-        PF_PAGE--;
-      }
-      renderPF();
-      document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
-      autoScrollTimer = null;
       lastScrollDirection = null;
-    }, 100); // 0.1 秒後翻頁（加速）
+      autoScrollTimer = null;
+    }, 300); // 300ms 冷卻時間，避免連續翻頁
   }
   // 如果離開邊緣，清除計時器
   else if (!direction && lastScrollDirection) {
@@ -1791,6 +1823,12 @@ function handleDragEnd(e) {
     autoScrollTimer = null;
     lastScrollDirection = null;
   }
+  
+  // 隱藏箭頭
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  if (leftArrow) leftArrow.classList.remove('show');
+  if (rightArrow) rightArrow.classList.remove('show');
 }
 
 // 在登入後為作品集項目添加拖曳事件
