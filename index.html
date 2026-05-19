@@ -407,6 +407,17 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .video-modal-close{top:-45px;font-size:1.5rem;width:45px;height:45px}
 }
 
+
+/* 拖曳箭頭 */
+.drag-arrow{position:fixed;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;color:var(--gold);opacity:0;pointer-events:none;transition:opacity .3s,transform .3s,box-shadow .3s;z-index:1000;cursor:pointer;border-radius:50%;background:rgba(9,9,11,0.4);backdrop-filter:blur(4px)}
+.drag-arrow-left{left:16px}
+.drag-arrow-right{right:16px}
+.drag-arrow.show{pointer-events:auto}
+.drag-arrow.edge-hover{transform:translateY(-50%) scale(1.15);filter:drop-shadow(0 0 12px var(--gold))}
+
+/* 拖曳中的作品卡片金色框線 + 發光 */
+.pf-item.dragging{outline:3px solid var(--gold)!important;box-shadow:0 0 28px rgba(201,150,58,0.75),0 0 56px rgba(201,150,58,0.4)!important;z-index:20;transform:scale(1.02)}
+
 </style>
 </head>
 <body>
@@ -489,6 +500,9 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
   0% { transform: translateX(100%); }
   100% { transform: translateX(-100%); }
 }
+
+/* 拖曳箭頭 CSS 定義在 head 的主要 style 中 */
+
 </style>
 
 <section id="about" class="section">
@@ -533,6 +547,19 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
     <div class="pf-filters" id="pf-filters"></div>
     <input type="text" id="pf-search" class="pf-search" placeholder="🔍 搜尋作品">
   </div>
+  
+  <!-- 拖曳翻頁箭頭指示器（可點擊翻頁） -->
+  <div id="drag-arrow-left" class="drag-arrow drag-arrow-left" onclick="pfArrowNav(-1)" title="上一頁">
+    <svg width="40" height="60" viewBox="0 0 40 60">
+      <polygon points="30,10 10,30 30,50" fill="currentColor"/>
+    </svg>
+  </div>
+  <div id="drag-arrow-right" class="drag-arrow drag-arrow-right" onclick="pfArrowNav(1)" title="下一頁">
+    <svg width="40" height="60" viewBox="0 0 40 60">
+      <polygon points="10,10 30,30 10,50" fill="currentColor"/>
+    </svg>
+  </div>
+  
   <div class="portfolio-grid" id="portfolio-list"></div>
   <div class="pf-pagination" id="pf-pagination"></div>
 </section>
@@ -748,7 +775,13 @@ var DEF = {
     autoSaveSeconds: 60, // 預設 60 秒後自動儲存
     copyrightTemplate: '',
     sendMessageEmail: '',
-    inboxGmailUrl: ''
+    inboxGmailUrl: '',
+    dragArrowColor: '#C9963A',
+    dragArrowSize: 60,
+    dragArrowOpacity: 0.4,
+    dragArrowHoverOpacity: 0.9,
+    dragArrowCooldown: 300,
+    dragArrowActiveGlow: 20
   },
   gmailUrl: 'https://mail.google.com/mail/u/2/#inbox',
   mailToAddress: '',
@@ -770,7 +803,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -780,6 +813,7 @@ var EDITABLE_NAMES = {
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
+  dragArrowColor:'拖曳箭頭顏色',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
   autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
 
@@ -1211,6 +1245,28 @@ function applyTheme() {
   document.head.appendChild(st);
 }
 
+function applyDragArrowStyles() {
+  var bs = D.backendSettings || {};
+  var color = bs.dragArrowColor || '#C9963A';
+  var size = bs.dragArrowSize || 60;
+  var opacity = bs.dragArrowOpacity || 0.4;
+  var hoverOpacity = bs.dragArrowHoverOpacity || 0.9;
+  var glowPx = bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20;
+
+  var styleId = 'drag-arrow-style';
+  var existing = document.getElementById(styleId);
+  if (existing) existing.remove();
+
+  var st = document.createElement('style');
+  st.id = styleId;
+  st.textContent =
+    '.drag-arrow{color:' + color + ';width:' + size + 'px;height:' + (size * 1.33) + 'px;font-size:' + (size * 0.5) + 'px}' +
+    '.drag-arrow.show{opacity:' + opacity + '}' +
+    '.drag-arrow.show:hover,.drag-arrow.edge-hover{opacity:' + hoverOpacity + '}' +
+    '.drag-arrow.edge-hover{filter:drop-shadow(0 0 ' + glowPx + 'px ' + color + ') brightness(1.4)!important}';
+  document.head.appendChild(st);
+}
+
 /* ============================================================
    INIT PAGE (runs after intro)
 ============================================================ */
@@ -1226,6 +1282,7 @@ function initPage() {
   initClock();
   initWeather();
   initAdminBarHover();
+  applyDragArrowStyles();
 }
 
 /* ============================================================
@@ -1685,14 +1742,19 @@ var lastScrollDirection = null;
 function handleDragStart(e) {
   draggedItem = this;
   draggedIndex = parseInt(this.dataset.index);
-  this.style.opacity = '0.4';
+  this.style.opacity = '0.5';
+  this.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
-  
-  // 顯示兩側箭頭
-  var leftArrow = document.getElementById('drag-arrow-left');
-  var rightArrow = document.getElementById('drag-arrow-right');
-  if (leftArrow) leftArrow.classList.add('show');
-  if (rightArrow) rightArrow.classList.add('show');
+
+  // 顯示拖曳箭頭（有多頁時才顯示）
+  var totalItems = D.portfolio.length;
+  var totalPages = Math.ceil(totalItems / PF_PER_PAGE);
+  if (totalPages > 1) {
+    var leftArrow = document.getElementById('drag-arrow-left');
+    var rightArrow = document.getElementById('drag-arrow-right');
+    if (leftArrow) leftArrow.classList.add('show');
+    if (rightArrow) rightArrow.classList.add('show');
+  }
 }
 
 function handleDragOver(e) {
@@ -1707,48 +1769,40 @@ function handleDragOver(e) {
   var totalPages = Math.ceil(D.portfolio.length / PF_PER_PAGE);
   var direction = null;
   
-  var leftArrow = document.getElementById('drag-arrow-left');
-  var rightArrow = document.getElementById('drag-arrow-right');
-  
   // 滑鼠在右邊緣 - 下一頁
   if (mouseX > viewportWidth - edgeThreshold && PF_PAGE < totalPages - 1) {
     direction = 'next';
-    if (rightArrow) rightArrow.classList.add('hover');
-    if (leftArrow) leftArrow.classList.remove('hover');
   }
   // 滑鼠在左邊緣 - 上一頁
   else if (mouseX < edgeThreshold && PF_PAGE > 0) {
     direction = 'prev';
-    if (leftArrow) leftArrow.classList.add('hover');
-    if (rightArrow) rightArrow.classList.remove('hover');
-  }
-  else {
-    // 不在邊緣，移除 hover
-    if (leftArrow) leftArrow.classList.remove('hover');
-    if (rightArrow) rightArrow.classList.remove('hover');
   }
   
-  // 如果方向改變，立即翻頁
+  // 更新箭頭的 edge-hover 樣式
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  if (leftArrow) leftArrow.classList.toggle('edge-hover', direction === 'prev');
+  if (rightArrow) rightArrow.classList.toggle('edge-hover', direction === 'next');
+
+  // 如果方向改變，清除舊計時器並設置新的
+  var cooldown = (D.backendSettings && D.backendSettings.dragArrowCooldown) || 300;
   if (direction && direction !== lastScrollDirection) {
     if (autoScrollTimer) {
       clearTimeout(autoScrollTimer);
     }
-    
+
     lastScrollDirection = direction;
-    
-    // 立即翻頁
-    if (direction === 'next') {
-      PF_PAGE++;
-    } else if (direction === 'prev') {
-      PF_PAGE--;
-    }
-    renderPF();
-    
-    // 冷卻時間
     autoScrollTimer = setTimeout(function() {
-      lastScrollDirection = null;
+      if (direction === 'next') {
+        PF_PAGE++;
+      } else if (direction === 'prev') {
+        PF_PAGE--;
+      }
+      renderPF();
+      document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
       autoScrollTimer = null;
-    }, 300);
+      lastScrollDirection = null;
+    }, cooldown);
   }
   // 如果離開邊緣，清除計時器
   else if (!direction && lastScrollDirection) {
@@ -1804,29 +1858,25 @@ function handleDrop(e) {
 
 function handleDragEnd(e) {
   this.style.opacity = '1';
+  this.classList.remove('dragging');
   var items = document.querySelectorAll('.pf-item');
   items.forEach(function(item) {
     item.style.border = '';
     item.style.boxShadow = '';
+    item.classList.remove('dragging');
   });
-  
+
+  // 隱藏拖曳箭頭
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  if (leftArrow) { leftArrow.classList.remove('show'); leftArrow.classList.remove('edge-hover'); }
+  if (rightArrow) { rightArrow.classList.remove('show'); rightArrow.classList.remove('edge-hover'); }
+
   // 清除翻頁計時器
   if (autoScrollTimer) {
     clearTimeout(autoScrollTimer);
     autoScrollTimer = null;
     lastScrollDirection = null;
-  }
-  
-  // 隱藏箭頭
-  var leftArrow = document.getElementById('drag-arrow-left');
-  var rightArrow = document.getElementById('drag-arrow-right');
-  if (leftArrow) {
-    leftArrow.classList.remove('show');
-    leftArrow.classList.remove('hover');
-  }
-  if (rightArrow) {
-    rightArrow.classList.remove('show');
-    rightArrow.classList.remove('hover');
   }
 }
 
@@ -1988,6 +2038,21 @@ window.goToPage = function(page) {
   PF_PAGE = page;
   renderPF();
   document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
+};
+
+window.pfArrowNav = function(dir) {
+  var items = D.portfolio.slice();
+  if (CF !== 'All') items = items.filter(function(item) { return item.cat === CF; });
+  if (SQ) items = items.filter(function(item) {
+    return item.title.toLowerCase().indexOf(SQ) !== -1 || item.cat.toLowerCase().indexOf(SQ) !== -1;
+  });
+  var totalPages = Math.ceil(items.length / PF_PER_PAGE);
+  var newPage = PF_PAGE + dir;
+  if (newPage >= 0 && newPage < totalPages) {
+    PF_PAGE = newPage;
+    renderPF();
+    document.getElementById('portfolio').scrollIntoView({ behavior: 'smooth' });
+  }
 };
 
 /* Hover preview system */
@@ -2625,18 +2690,9 @@ function updateAdminUI() {
       var req = btns[i].getAttribute('data-role') || 'editor';
       var ok = false;
       
-      // 後台設定按鈕特殊處理
+      // 後台設定按鈕：所有已登入用戶都可以進入
       if (btnId === 'backend-settings-btn') {
-        if (CU.role === 'super_admin') {
-          ok = true; // 超級執行長一定顯示
-        } else {
-          // 其他人：檢查是否有任何權限
-          var hasAnyPermission = false;
-          if (CU.permissions && CU.permissions.length > 0) {
-            hasAnyPermission = true;
-          }
-          ok = hasAnyPermission;
-        }
+        ok = true;
       } else if (req === 'editor') {
         ok = true; // 所有角色都可以使用 editor 級別的按鈕
       } else if (req === 'ops_admin') {
@@ -2825,74 +2881,34 @@ window.openBackendSettings = function() {
     html: (function() {
       var h = '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:680px;overflow-y:auto;padding:10px">';
       var isSuperAdmin = CU && CU.role === 'super_admin';
-      
-      // 首頁設定
-      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏠 首頁設定</h3>';
-      
+      var t = D.theme || {};
+      var bs = D.backendSettings || {};
+      var social = D.social || {};
+
+      // ─── 1. 開場動畫設定 ───
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 開場動畫設定</h3>';
       if (isSuperAdmin || canEdit('introTagline')) {
         h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">1. 開場動畫大標題：<input id="bs-intro-tagline" class="swal2-input" style="margin-top:4px" value="' + (D.introTagline||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
       }
       if (isSuperAdmin || canEdit('introTaglineSize')) {
         h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">2. 開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>';
       }
-      if (isSuperAdmin || canEdit('heroSubtitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">3. Logo 下方小標：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
-      }
-      if (isSuperAdmin || canEdit('heroEnTitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">4. 英文大標：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>';
-      }
-      if (isSuperAdmin || canEdit('heroZhTitle')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">5. 中文副標：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="馬克伍號影像工作室"></label>';
-      }
-      if (isSuperAdmin || canEdit('heroDesc')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">6. 首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
-      }
-      
-      // 最新公告跑馬燈
-      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📢 最新公告</h3>';
-      
-      if (isSuperAdmin || canEdit('marqueeItems')) {
-        var marqueeList = (D.marqueeItems || []).join('\n');
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">7. 公告內容：<textarea id="bs-marquee-items" class="swal2-textarea" style="margin-top:4px;min-height:80px" placeholder="每行一則公告（支援 emoji）">' + marqueeList + '</textarea></label>';
-        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：每行一則公告，可使用 emoji</small>';
-      }
-      if (isSuperAdmin || canEdit('marqueeColor')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">8. 跑馬文字顏色：<input id="bs-marquee-color" type="color" class="swal2-input" style="margin-top:4px;width:100px;height:40px" value="' + (D.marqueeColor||'#FFFFFF') + '"></label>';
-      }
-      if (isSuperAdmin || canEdit('marqueeSpeed')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">9. 跑馬速度（秒）：<input id="bs-marquee-speed" type="number" class="swal2-input" style="margin-top:4px" value="' + (D.marqueeSpeed||30) + '" placeholder="30" min="5" max="60"></label>';
-        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：數字越小速度越快（5-60 秒）</small>';
-      }
-      if (isSuperAdmin || canEdit('marqueeShow')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem"><input id="bs-marquee-show" type="checkbox" style="margin-right:8px"' + (D.marqueeShow !== false ? ' checked' : '') + '>10. 顯示跑馬燈</label>';
-      }
-      
-      // 外觀設定
-      var t = D.theme || {};
-      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🎨 外觀設定</h3>';
-      
       if (isSuperAdmin || canEdit('introLogoSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">11. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">3. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
       }
+
+      // ─── 2. 頂端資訊欄 ───
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 頂端資訊欄</h3>';
       if (isSuperAdmin || canEdit('datetimeSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">12. 日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">4. 日期時間天氣大小：<input id="bs-datetime-size" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeSize||'') + '" placeholder=".78rem"></label>';
       }
       if (isSuperAdmin || canEdit('datetimeFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">13. 日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">5. 日期時間天氣字型：<input id="bs-datetime-font" class="swal2-input" style="margin-top:4px" value="' + (t.datetimeFont||'') + '" placeholder="Bebas Neue"></label>';
       }
-      if (isSuperAdmin || canEdit('heroEnFont')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">14. 英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
-      }
-      if (isSuperAdmin || canEdit('heroEnSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">15. 英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
-      }
-      if (isSuperAdmin || canEdit('heroZhSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">16. 中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
-      }
-      
-      // Logo 設定
+
+      // ─── 3. Logo 設定 ───
       if (isSuperAdmin || canEdit('logo')) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔄 31. Logo 設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 6. Logo 設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:10px">目前 Logo：</p>';
         h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
         h += '<img src="' + (D.logoData || '') + '" style="width:60px;height:60px;border-radius:50%;border:2px solid var(--gold)">';
@@ -2900,8 +2916,32 @@ window.openBackendSettings = function() {
         h += '</div>';
         h += '<small style="color:var(--t3);font-size:.75rem">提示：Logo 會顯示在網站左上角（38x38px）和開場動畫</small>';
       }
-      
-      // 輪播設定
+
+      // ─── 4. 首頁英雄區 ───
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 首頁英雄區</h3>';
+      if (isSuperAdmin || canEdit('heroSubtitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">7. Logo 下方小標：<input id="bs-hero-subtitle" class="swal2-input" style="margin-top:4px" value="' + (D.heroSubtitle||'') + '" placeholder="MARK NO.5.STUDIO"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnTitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">8. 英文大標：<input id="bs-hero-en" class="swal2-input" style="margin-top:4px" value="' + (D.heroEnTitle||'') + '" placeholder="MARK NO.5"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroZhTitle')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">9. 中文副標：<input id="bs-hero-zh" class="swal2-input" style="margin-top:4px" value="' + (D.heroZhTitle||'') + '" placeholder="馬克伍號影像工作室"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroDesc')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">10. 首頁說明：<textarea id="bs-hero-desc" class="swal2-textarea" style="margin-top:4px;min-height:60px">' + (D.heroDesc||'') + '</textarea></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnFont')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">11. 英文大標字體：<input id="bs-hero-en-font" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnFont||'') + '" placeholder="Google Sans Flex"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroEnSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">12. 英文大標大小：<input id="bs-hero-en-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroEnSize||'') + '" placeholder="clamp(3rem,8vw,7.5rem)"></label>';
+      }
+      if (isSuperAdmin || canEdit('heroZhSize')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">13. 中文副標大小：<input id="bs-hero-zh-size" class="swal2-input" style="margin-top:4px" value="' + (t.heroZhSize||'') + '" placeholder="clamp(1.5rem,3vw,2.6rem)"></label>';
+      }
+
+      // ─── 5. 輪播設定 ───
       if (isSuperAdmin || canEdit('carousel')) {
         var carouselHtml = '';
         if (D.carousel && D.carousel.length > 0) {
@@ -2913,13 +2953,49 @@ window.openBackendSettings = function() {
         } else {
           carouselHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未上傳輪播圖片</div>';
         }
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🖼 32. 輪播設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 14. 輪播設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前輪播圖片（' + (D.carousel ? D.carousel.length : 0) + ' 張）：</p>';
         h += carouselHtml;
         h += '<button onclick="manageCarousel()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理輪播圖片</button>';
       }
-      
-      // 分類設定
+
+      // ─── 6. 最新公告跑馬燈 ───
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 最新公告</h3>';
+      if (isSuperAdmin || canEdit('marqueeItems')) {
+        var marqueeList = (D.marqueeItems || []).join('\n');
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">15. 公告內容：<textarea id="bs-marquee-items" class="swal2-textarea" style="margin-top:4px;min-height:80px" placeholder="每行一則公告（支援 emoji）">' + marqueeList + '</textarea></label>';
+        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：每行一則公告，可使用 emoji</small>';
+      }
+      if (isSuperAdmin || canEdit('marqueeColor')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">16. 跑馬文字顏色：<input id="bs-marquee-color" type="color" class="swal2-input" style="margin-top:4px;width:100px;height:40px" value="' + (D.marqueeColor||'#FFFFFF') + '"></label>';
+      }
+      if (isSuperAdmin || canEdit('marqueeSpeed')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">17. 跑馬速度（秒）：<input id="bs-marquee-speed" type="number" class="swal2-input" style="margin-top:4px" value="' + (D.marqueeSpeed||30) + '" placeholder="30" min="5" max="60"></label>';
+        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：數字越小速度越快（5-60 秒）</small>';
+      }
+      if (isSuperAdmin || canEdit('marqueeShow')) {
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem"><input id="bs-marquee-show" type="checkbox" style="margin-right:8px"' + (D.marqueeShow !== false ? ' checked' : '') + '>18. 顯示跑馬燈</label>';
+      }
+
+      // ─── 7. 服務項目說明 ───
+      if (isSuperAdmin || canEdit('serviceDescriptions')) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 19. 服務項目說明</h3>';
+        h += '<button onclick="editServiceDescriptions()" class="swal2-confirm swal2-styled" style="margin-top:10px">編輯服務項目說明</button>';
+      }
+
+      // ─── 8. 流程數字亮度 ───
+      var hasProcPermission = isSuperAdmin || canEdit('procNumOpacity') || canEdit('procNumHoverOpacity');
+      if (hasProcPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 流程數字亮度</h3>';
+        if (isSuperAdmin || canEdit('procNumOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">20. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
+        }
+        if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">21. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
+        }
+      }
+
+      // ─── 9. 作品集設定 ───
       if (isSuperAdmin || canEdit('categories')) {
         var categoriesHtml = '';
         if (D.pfCategories && D.pfCategories.length > 0) {
@@ -2931,90 +3007,102 @@ window.openBackendSettings = function() {
         } else {
           categoriesHtml = '<div style="color:var(--t3);font-size:.8rem;margin-top:8px">尚未設定作品分類</div>';
         }
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🏷 33. 分類設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 22. 作品分類設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前作品分類（' + (D.pfCategories ? D.pfCategories.length : 0) + ' 個）：</p>';
         h += categoriesHtml;
         h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
       }
-      
-      if (isSuperAdmin || canEdit('serviceDescriptions')) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">📝 34. 服務項目說明</h3>';
-        h += '<button onclick="editServiceDescriptions()" class="swal2-confirm swal2-styled" style="margin-top:10px">編輯服務項目說明</button>';
+
+      // ─── 10. 拖曳箭頭設定 ───
+      var hasArrowPermission = isSuperAdmin || canEdit('dragArrowColor') || canEdit('dragArrowSize') || canEdit('dragArrowOpacity') || canEdit('dragArrowHoverOpacity') || canEdit('dragArrowCooldown') || canEdit('dragArrowActiveGlow');
+      if (hasArrowPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 作品集翻頁箭頭</h3>';
+        if (isSuperAdmin || canEdit('dragArrowColor')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 箭頭顏色：<input id="bs-arrow-color" type="color" style="margin-top:4px;width:100px;height:40px;padding:2px;border:1px solid var(--border-g);background:var(--bg2);cursor:pointer;vertical-align:middle" value="' + (bs.dragArrowColor||'#C9963A') + '"></label>';
+        }
+        if (isSuperAdmin || canEdit('dragArrowSize')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
+        }
+        if (isSuperAdmin || canEdit('dragArrowOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 箭頭透明度（0-1）：<input id="bs-arrow-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowOpacity||0.4) + '" placeholder="0.4"></label>';
+        }
+        if (isSuperAdmin || canEdit('dragArrowHoverOpacity')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 拖曳到箭頭時透明度（0-1）：<input id="bs-arrow-hover-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowHoverOpacity||0.9) + '" placeholder="0.9"></label>';
+        }
+        if (isSuperAdmin || canEdit('dragArrowCooldown')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 翻頁冷卻時間（毫秒）：<input id="bs-arrow-cooldown" class="swal2-input" style="margin-top:4px" type="number" min="100" max="1000" step="50" value="' + (bs.dragArrowCooldown||300) + '" placeholder="300"></label>';
+          h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳翻頁後的冷卻時間（100-1000 毫秒）</small>';
+        }
+        if (isSuperAdmin || canEdit('dragArrowActiveGlow')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 拖曳到箭頭時發光強度（px）：<input id="bs-arrow-active-glow" class="swal2-input" style="margin-top:4px" type="number" min="0" max="60" step="2" value="' + (bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20) + '" placeholder="20"></label>';
+          h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳影片靠近箭頭時的光暈半徑，0 為無發光（0-60 px）</small>';
+        }
       }
-      
-      // 社群連結
-      var social = D.social || {};
-      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔗 社群連結</h3>';
-      
+
+      // ─── 11. 社群連結 ───
+      h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 社群連結</h3>';
       if (isSuperAdmin || canEdit('socialFacebook')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">17. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">29. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialInstagram')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">18. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">30. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialThreads')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">19. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">31. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialYoutube')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">20. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">32. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialLine')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">17. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">33. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
-      
-      // 光暈設定
+
+      // ─── 12. 聯絡資訊 ───
+      var hasContactPermission = isSuperAdmin || canEdit('contactEmail') || canEdit('email');
+      if (hasContactPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 聯絡資訊</h3>';
+        if (isSuperAdmin || canEdit('contactEmail')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">34. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+        }
+        if (isSuperAdmin || canEdit('email')) {
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">35. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+        }
+      }
+
+      // ─── 13. 光暈效果 ───
       var hasRipplePermission = isSuperAdmin || canEdit('rippleColor') || canEdit('rippleOpacity') || canEdit('rippleSize') || canEdit('rippleWidth');
       if (hasRipplePermission) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🌟 光暈設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 點擊光暈效果</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">36. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">37. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">38. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
-      
-      // 流程數字亮度
-      var hasProcPermission = isSuperAdmin || canEdit('procNumOpacity') || canEdit('procNumHoverOpacity');
-      if (hasProcPermission) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">🔢 流程數字亮度</h3>';
-        if (isSuperAdmin || canEdit('procNumOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 流程數字預設亮度：<input id="bs-proc-dim" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumOpacity||'') + '" placeholder="0.15"></label>';
-        }
-        if (isSuperAdmin || canEdit('procNumHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 流程數字 Hover 亮度：<input id="bs-proc-hover" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.procNumHoverOpacity||'') + '" placeholder="0.5"></label>';
-        }
-      }
-      
-      // 系統設定
-      var bs = D.backendSettings || {};
-      var hasSysPermission = isSuperAdmin || canEdit('autoLogout') || canEdit('copyright') || canEdit('email');
+
+      // ─── 14. 系統設定 ───
+      var hasSysPermission = isSuperAdmin || canEdit('autoLogout') || canEdit('autoSave') || canEdit('copyright');
       if (hasSysPermission) {
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">⚙️ 系統設定</h3>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">36. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">37. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">41. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定（10-600 秒）</small>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">38. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
-        }
-        if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
-        }
-        if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">42. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
       }
-      
+
       h += '</div>';
       return h;
     })(),
@@ -3163,6 +3251,32 @@ window.openBackendSettings = function() {
         if (el) v.procNumHoverOpacity = el.value;
       }
       
+      // 拖曳箭頭設定
+      if (isSuperAdmin || canEdit('dragArrowColor')) {
+        var el = document.getElementById('bs-arrow-color');
+        if (el) v.dragArrowColor = el.value;
+      }
+      if (isSuperAdmin || canEdit('dragArrowSize')) {
+        var el = document.getElementById('bs-arrow-size');
+        if (el) v.dragArrowSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('dragArrowOpacity')) {
+        var el = document.getElementById('bs-arrow-opacity');
+        if (el) v.dragArrowOpacity = el.value;
+      }
+      if (isSuperAdmin || canEdit('dragArrowHoverOpacity')) {
+        var el = document.getElementById('bs-arrow-hover-opacity');
+        if (el) v.dragArrowHoverOpacity = el.value;
+      }
+      if (isSuperAdmin || canEdit('dragArrowCooldown')) {
+        var el = document.getElementById('bs-arrow-cooldown');
+        if (el) v.dragArrowCooldown = el.value;
+      }
+      if (isSuperAdmin || canEdit('dragArrowActiveGlow')) {
+        var el = document.getElementById('bs-arrow-active-glow');
+        if (el) v.dragArrowActiveGlow = el.value;
+      }
+
       // 系統設定
       if (isSuperAdmin || canEdit('autoLogout')) {
         var el = document.getElementById('bs-auto-logout');
@@ -3233,6 +3347,12 @@ window.openBackendSettings = function() {
       
       // 更新系統設定
       if (!D.backendSettings) D.backendSettings = {};
+      if (v.dragArrowColor !== undefined) D.backendSettings.dragArrowColor = v.dragArrowColor;
+      if (v.dragArrowSize !== undefined) D.backendSettings.dragArrowSize = parseInt(v.dragArrowSize);
+      if (v.dragArrowOpacity !== undefined) D.backendSettings.dragArrowOpacity = parseFloat(v.dragArrowOpacity);
+      if (v.dragArrowHoverOpacity !== undefined) D.backendSettings.dragArrowHoverOpacity = parseFloat(v.dragArrowHoverOpacity);
+      if (v.dragArrowCooldown !== undefined) D.backendSettings.dragArrowCooldown = parseInt(v.dragArrowCooldown);
+      if (v.dragArrowActiveGlow !== undefined) D.backendSettings.dragArrowActiveGlow = parseInt(v.dragArrowActiveGlow);
       if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
       if (v.autoSave !== undefined) D.backendSettings.autoSaveSeconds = parseInt(v.autoSave);
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
@@ -3243,10 +3363,11 @@ window.openBackendSettings = function() {
       persist();
       applyTheme();
       updateDOM();
+      if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
       
       // 重新啟動自動登出和自動儲存計時器
       if (CU) {
-        startAutoLogout(); startAutoSave();
+        startAutoLogout();
         startAutoSave();
       }
       
