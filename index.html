@@ -1271,8 +1271,20 @@ function positionDragArrows() {
   var leftArrow = document.getElementById('drag-arrow-left');
   var rightArrow = document.getElementById('drag-arrow-right');
   if (!grid || !leftArrow || !rightArrow) return;
-  var rect = grid.getBoundingClientRect();
-  var centerY = rect.top + rect.height / 2;
+  var items = grid.querySelectorAll('.pf-item');
+  var centerY;
+  if (items.length >= 5) {
+    // 第二行第一格（4欄格局，index 4）的垂直中心
+    var r = items[4].getBoundingClientRect();
+    centerY = r.top + r.height / 2;
+  } else if (items.length > 0) {
+    var r0 = items[0].getBoundingClientRect();
+    var rN = items[items.length - 1].getBoundingClientRect();
+    centerY = (r0.top + rN.bottom) / 2;
+  } else {
+    var rect = grid.getBoundingClientRect();
+    centerY = rect.top + rect.height / 2;
+  }
   leftArrow.style.top = centerY + 'px';
   rightArrow.style.top = centerY + 'px';
   leftArrow.style.transform = 'translateY(-50%)';
@@ -1758,16 +1770,7 @@ function handleDragStart(e) {
   this.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
 
-  // 顯示拖曳箭頭（有多頁時才顯示）
-  var totalItems = D.portfolio.length;
-  var totalPages = Math.ceil(totalItems / PF_PER_PAGE);
-  if (totalPages > 1) {
-    var leftArrow = document.getElementById('drag-arrow-left');
-    var rightArrow = document.getElementById('drag-arrow-right');
-    if (leftArrow) leftArrow.classList.add('show');
-    if (rightArrow) rightArrow.classList.add('show');
-    positionDragArrows();
-  }
+  positionDragArrows();
 }
 
 function handleDragOver(e) {
@@ -1879,11 +1882,11 @@ function handleDragEnd(e) {
     item.classList.remove('dragging');
   });
 
-  // 隱藏拖曳箭頭
+  // 清除箭頭 edge-hover 樣式（保留 show，由 renderPF 管理）
   var leftArrow = document.getElementById('drag-arrow-left');
   var rightArrow = document.getElementById('drag-arrow-right');
-  if (leftArrow) { leftArrow.classList.remove('show'); leftArrow.classList.remove('edge-hover'); }
-  if (rightArrow) { rightArrow.classList.remove('show'); rightArrow.classList.remove('edge-hover'); }
+  if (leftArrow) leftArrow.classList.remove('edge-hover');
+  if (rightArrow) rightArrow.classList.remove('edge-hover');
 
   // 清除翻頁計時器
   if (autoScrollTimer) {
@@ -2060,6 +2063,14 @@ function renderPF() {
     paginationDiv.innerHTML = '';
   }
   
+  // 多頁時永久顯示箭頭，單頁時隱藏（讓用戶隨時看到設定效果）
+  var pfLeft = document.getElementById('drag-arrow-left');
+  var pfRight = document.getElementById('drag-arrow-right');
+  if (pfLeft && pfRight) {
+    pfLeft.classList.toggle('show', totalPages > 1);
+    pfRight.classList.toggle('show', totalPages > 1);
+  }
+
   // 啟用拖曳排序（只有登入用戶）
   if (CU) {
     setTimeout(function() {
@@ -3428,11 +3439,11 @@ window.openBackendSettings = function() {
       updateDOM();
       if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
 
-      // 短暫顯示箭頭讓用戶確認設定效果
+      // 若箭頭未顯示（單頁），短暫預覽讓用戶確認設定效果
       (function() {
         var pl = document.getElementById('drag-arrow-left');
         var pr = document.getElementById('drag-arrow-right');
-        if (pl && pr) {
+        if (pl && pr && !pl.classList.contains('show')) {
           positionDragArrows();
           pl.classList.add('show'); pr.classList.add('show');
           setTimeout(function() {
