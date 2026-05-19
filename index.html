@@ -413,7 +413,6 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 .drag-arrow-left{left:16px}
 .drag-arrow-right{right:16px}
 .drag-arrow.show{pointer-events:auto}
-.drag-arrow.edge-hover{transform:translateY(-50%) scale(1.15);filter:drop-shadow(0 0 12px var(--gold))}
 
 /* 拖曳中的作品卡片金色框線 + 發光 */
 .pf-item.dragging{outline:3px solid var(--gold)!important;box-shadow:0 0 28px rgba(201,150,58,0.75),0 0 56px rgba(201,150,58,0.4)!important;z-index:20;transform:scale(1.02)}
@@ -550,12 +549,12 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
   
   <!-- 拖曳翻頁箭頭指示器（可點擊翻頁） -->
   <div id="drag-arrow-left" class="drag-arrow drag-arrow-left" onclick="pfArrowNav(-1)" title="上一頁">
-    <svg width="40" height="60" viewBox="0 0 40 60">
+    <svg width="100%" height="100%" viewBox="0 0 40 60">
       <polygon points="30,10 10,30 30,50" fill="currentColor"/>
     </svg>
   </div>
   <div id="drag-arrow-right" class="drag-arrow drag-arrow-right" onclick="pfArrowNav(1)" title="下一頁">
-    <svg width="40" height="60" viewBox="0 0 40 60">
+    <svg width="100%" height="100%" viewBox="0 0 40 60">
       <polygon points="10,10 30,30 10,50" fill="currentColor"/>
     </svg>
   </div>
@@ -1260,11 +1259,24 @@ function applyDragArrowStyles() {
   var st = document.createElement('style');
   st.id = styleId;
   st.textContent =
-    '.drag-arrow{color:' + color + ';width:' + size + 'px;height:' + (size * 1.33) + 'px;font-size:' + (size * 0.5) + 'px}' +
+    '.drag-arrow{color:' + color + ';width:' + size + 'px;height:' + (size * 1.33) + 'px}' +
     '.drag-arrow.show{opacity:' + opacity + '}' +
     '.drag-arrow.show:hover,.drag-arrow.edge-hover{opacity:' + hoverOpacity + '}' +
-    '.drag-arrow.edge-hover{filter:drop-shadow(0 0 ' + glowPx + 'px ' + color + ') brightness(1.4)!important}';
+    '.drag-arrow.edge-hover{filter:drop-shadow(0 0 ' + glowPx + 'px ' + color + ') brightness(1.8)!important;transform:translateY(-50%) scale(1.15)!important}';
   document.head.appendChild(st);
+}
+
+function positionDragArrows() {
+  var grid = document.getElementById('portfolio-list');
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  if (!grid || !leftArrow || !rightArrow) return;
+  var rect = grid.getBoundingClientRect();
+  var centerY = rect.top + rect.height / 2;
+  leftArrow.style.top = centerY + 'px';
+  rightArrow.style.top = centerY + 'px';
+  leftArrow.style.transform = 'translateY(-50%)';
+  rightArrow.style.transform = 'translateY(-50%)';
 }
 
 /* ============================================================
@@ -1754,6 +1766,7 @@ function handleDragStart(e) {
     var rightArrow = document.getElementById('drag-arrow-right');
     if (leftArrow) leftArrow.classList.add('show');
     if (rightArrow) rightArrow.classList.add('show');
+    positionDragArrows();
   }
 }
 
@@ -1917,6 +1930,31 @@ document.addEventListener('DOMContentLoaded', function() {
       handleDragEnd.call(e.target, e);
     }
   });
+
+  // 箭頭拖曳事件：拖曳進入箭頭時立即翻頁 + 發光
+  var arrowLeft = document.getElementById('drag-arrow-left');
+  var arrowRight = document.getElementById('drag-arrow-right');
+  function setupArrowDragNav(arrowEl, dir) {
+    if (!arrowEl) return;
+    arrowEl.addEventListener('dragenter', function(e) {
+      if (!CU || !draggedItem) return;
+      e.preventDefault();
+      if (autoScrollTimer) { clearTimeout(autoScrollTimer); autoScrollTimer = null; lastScrollDirection = null; }
+      arrowEl.classList.add('edge-hover');
+      window.pfArrowNav(dir);
+      setTimeout(positionDragArrows, 50);
+    });
+    arrowEl.addEventListener('dragleave', function(e) {
+      arrowEl.classList.remove('edge-hover');
+    });
+    arrowEl.addEventListener('dragover', function(e) {
+      if (!CU || !draggedItem) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+  }
+  setupArrowDragNav(arrowLeft, -1);
+  setupArrowDragNav(arrowRight, 1);
 });
 
 function renderPF() {
@@ -2030,7 +2068,10 @@ function renderPF() {
         item.setAttribute('draggable', 'true');
         item.style.cursor = 'move';
       });
+      positionDragArrows();
     }, 100);
+  } else {
+    setTimeout(positionDragArrows, 100);
   }
 }
 
@@ -2967,7 +3008,18 @@ window.openBackendSettings = function() {
         h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：每行一則公告，可使用 emoji</small>';
       }
       if (isSuperAdmin || canEdit('marqueeColor')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">16. 跑馬文字顏色：<input id="bs-marquee-color" type="color" class="swal2-input" style="margin-top:4px;width:100px;height:40px" value="' + (D.marqueeColor||'#FFFFFF') + '"></label>';
+        var marqueeColor = D.marqueeColor || '#FFFFFF';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">16. 跑馬文字顏色：';
+        h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+        h += '<div id="bs-marquee-swatch" style="width:50px;height:40px;border-radius:4px;border:1px solid var(--border-g);background:' + marqueeColor + ';flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)"></div>';
+        h += '<input id="bs-marquee-color" type="text" style="margin:0;width:88px;background:var(--bg2);border:1px solid var(--border-g);color:var(--t1);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:.85rem;outline:none" value="' + marqueeColor + '" maxlength="7" placeholder="#FFFFFF" oninput="var s=document.getElementById(\'bs-marquee-swatch\');if(s&&/^#[0-9a-fA-F]{6}$/.test(this.value))s.style.background=this.value">';
+        h += '<div style="display:flex;gap:5px;flex-wrap:wrap">';
+        var mqPresets = ['#FFFFFF','#C9963A','#E4B86A','#F0EBE2','#888888','#B52020'];
+        for (var mpi = 0; mpi < mqPresets.length; mpi++) {
+          var mpc = mqPresets[mpi];
+          h += '<div onclick="document.getElementById(\'bs-marquee-color\').value=\'' + mpc + '\';document.getElementById(\'bs-marquee-swatch\').style.background=\'' + mpc + '\'" style="width:24px;height:24px;background:' + mpc + ';border-radius:3px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);transition:transform .1s" onmouseover="this.style.transform=\'scale(1.2)\'" onmouseout="this.style.transform=\'\'" title="' + mpc + '"></div>';
+        }
+        h += '</div></div></label>';
       }
       if (isSuperAdmin || canEdit('marqueeSpeed')) {
         h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">17. 跑馬速度（秒）：<input id="bs-marquee-speed" type="number" class="swal2-input" style="margin-top:4px" value="' + (D.marqueeSpeed||30) + '" placeholder="30" min="5" max="60"></label>';
@@ -3018,7 +3070,18 @@ window.openBackendSettings = function() {
       if (hasArrowPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 作品集翻頁箭頭</h3>';
         if (isSuperAdmin || canEdit('dragArrowColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 箭頭顏色：<input id="bs-arrow-color" type="color" style="margin-top:4px;width:100px;height:40px;padding:2px;border:1px solid var(--border-g);background:var(--bg2);cursor:pointer;vertical-align:middle" value="' + (bs.dragArrowColor||'#C9963A') + '"></label>';
+          var arrowColor = bs.dragArrowColor || '#C9963A';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 箭頭顏色：';
+          h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+          h += '<div id="bs-arrow-swatch" style="width:50px;height:40px;border-radius:4px;border:1px solid var(--border-g);background:' + arrowColor + ';flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)"></div>';
+          h += '<input id="bs-arrow-color" type="text" style="margin:0;width:88px;background:var(--bg2);border:1px solid var(--border-g);color:var(--t1);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:.85rem;outline:none" value="' + arrowColor + '" maxlength="7" placeholder="#C9963A" oninput="var s=document.getElementById(\'bs-arrow-swatch\');if(s&&/^#[0-9a-fA-F]{6}$/.test(this.value))s.style.background=this.value">';
+          h += '<div style="display:flex;gap:5px;flex-wrap:wrap">';
+          var presets = ['#C9963A','#E4B86A','#FFFFFF','#F0EBE2','#888888','#B52020'];
+          for (var pi = 0; pi < presets.length; pi++) {
+            var pc = presets[pi];
+            h += '<div onclick="document.getElementById(\'bs-arrow-color\').value=\'' + pc + '\';document.getElementById(\'bs-arrow-swatch\').style.background=\'' + pc + '\'" style="width:24px;height:24px;background:' + pc + ';border-radius:3px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);transition:transform .1s" onmouseover="this.style.transform=\'scale(1.2)\'" onmouseout="this.style.transform=\'\'" title="' + pc + '"></div>';
+          }
+          h += '</div></div></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowSize')) {
           h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
@@ -3364,7 +3427,20 @@ window.openBackendSettings = function() {
       applyTheme();
       updateDOM();
       if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
-      
+
+      // 短暫顯示箭頭讓用戶確認設定效果
+      (function() {
+        var pl = document.getElementById('drag-arrow-left');
+        var pr = document.getElementById('drag-arrow-right');
+        if (pl && pr) {
+          positionDragArrows();
+          pl.classList.add('show'); pr.classList.add('show');
+          setTimeout(function() {
+            if (!draggedItem) { pl.classList.remove('show'); pr.classList.remove('show'); }
+          }, 2000);
+        }
+      })();
+
       // 重新啟動自動登出和自動儲存計時器
       if (CU) {
         startAutoLogout();
