@@ -550,14 +550,10 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
   
   <!-- 拖曳翻頁箭頭指示器（可點擊翻頁） -->
   <div id="drag-arrow-left" class="drag-arrow drag-arrow-left" onclick="pfArrowNav(-1)" title="上一頁">
-    <svg width="100%" height="100%" viewBox="0 0 40 60">
-      <polygon points="30,10 10,30 30,50" fill="currentColor"/>
-    </svg>
+    <svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="24,15 13,30 24,45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="13" y1="30" x2="30" y2="30" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.35"/></svg>
   </div>
   <div id="drag-arrow-right" class="drag-arrow drag-arrow-right" onclick="pfArrowNav(1)" title="下一頁">
-    <svg width="100%" height="100%" viewBox="0 0 40 60">
-      <polygon points="10,10 30,30 10,50" fill="currentColor"/>
-    </svg>
+    <svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="16,15 27,30 16,45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="27" y1="30" x2="10" y2="30" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.35"/></svg>
   </div>
   
   <div class="portfolio-grid" id="portfolio-list"></div>
@@ -782,6 +778,7 @@ var DEF = {
     dragArrowHoverOpacity: 0.9,
     dragArrowCooldown: 300,
     dragArrowActiveGlow: 20,
+    dragArrowIcon: 'chevron',
     pfGlowColor: '#C9963A',
     pfGlowSize: 28,
     pfGlowRange: 56,
@@ -808,7 +805,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowIcon','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -818,7 +815,7 @@ var EDITABLE_NAMES = {
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
-  dragArrowColor:'拖曳箭頭顏色',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
+  dragArrowColor:'拖曳箭頭顏色',dragArrowIcon:'拖曳箭頭樣式',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
   pfGlowColor:'拖曳發光顏色',pfGlowSize:'拖曳發光大小',pfGlowRange:'拖曳發光範圍',pfGlowBrightness:'拖曳發光明亮',pfGlowSoftness:'拖曳發光柔化',
   autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
@@ -1273,6 +1270,30 @@ function applyDragArrowStyles() {
   document.head.appendChild(st);
 }
 
+function getDragArrowSVG(dir, type) {
+  var t = type || 'chevron';
+  if (dir === 'left') {
+    if (t === 'triangle') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polygon points="28,12 12,30 28,48" fill="currentColor"/></svg>';
+    if (t === 'angle') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="26,18 14,30 26,42" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if (t === 'double') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="28,15 18,30 28,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="20,15 10,30 20,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="24,15 13,30 24,45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="13" y1="30" x2="30" y2="30" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.35"/></svg>';
+  } else {
+    if (t === 'triangle') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polygon points="12,12 28,30 12,48" fill="currentColor"/></svg>';
+    if (t === 'angle') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="14,18 26,30 14,42" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if (t === 'double') return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="12,15 22,30 12,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="20,15 30,30 20,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<svg width="100%" height="100%" viewBox="0 0 40 60"><polyline points="16,15 27,30 16,45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="27" y1="30" x2="10" y2="30" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.35"/></svg>';
+  }
+}
+
+function updateDragArrowIcons() {
+  var bs = D.backendSettings || {};
+  var iconType = bs.dragArrowIcon || 'chevron';
+  var leftArrow = document.getElementById('drag-arrow-left');
+  var rightArrow = document.getElementById('drag-arrow-right');
+  if (leftArrow) leftArrow.innerHTML = getDragArrowSVG('left', iconType);
+  if (rightArrow) rightArrow.innerHTML = getDragArrowSVG('right', iconType);
+}
+
 function applyDragGlowStyles() {
   var bs = D.backendSettings || {};
   var color = bs.pfGlowColor || '#C9963A';
@@ -1341,6 +1362,7 @@ function initPage() {
   initAdminBarHover();
   applyDragArrowStyles();
   applyDragGlowStyles();
+  updateDragArrowIcons();
 }
 
 /* ============================================================
@@ -1805,7 +1827,15 @@ function handleDragStart(e) {
   this.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
 
-  positionDragArrows();
+  var totalItems = D.portfolio.length;
+  var totalPages = Math.ceil(totalItems / PF_PER_PAGE);
+  if (totalPages > 1) {
+    var leftArrow = document.getElementById('drag-arrow-left');
+    var rightArrow = document.getElementById('drag-arrow-right');
+    if (leftArrow) leftArrow.classList.add('show');
+    if (rightArrow) rightArrow.classList.add('show');
+    positionDragArrows();
+  }
 }
 
 function handleDragOver(e) {
@@ -1921,11 +1951,11 @@ function handleDragEnd(e) {
   // 清除拖曳目標發光
   if (lastDragOverItem) { lastDragOverItem.classList.remove('drag-over'); lastDragOverItem = null; }
 
-  // 清除箭頭 edge-hover 樣式（保留 show，由 renderPF 管理）
+  // 隱藏箭頭，清除 edge-hover
   var leftArrow = document.getElementById('drag-arrow-left');
   var rightArrow = document.getElementById('drag-arrow-right');
-  if (leftArrow) leftArrow.classList.remove('edge-hover');
-  if (rightArrow) rightArrow.classList.remove('edge-hover');
+  if (leftArrow) { leftArrow.classList.remove('show'); leftArrow.classList.remove('edge-hover'); }
+  if (rightArrow) { rightArrow.classList.remove('show'); rightArrow.classList.remove('edge-hover'); }
 
   // 清除翻頁計時器
   if (autoScrollTimer) {
@@ -2110,12 +2140,12 @@ function renderPF() {
     paginationDiv.innerHTML = '';
   }
   
-  // 多頁時永久顯示箭頭，單頁時隱藏（讓用戶隨時看到設定效果）
+  // 拖曳中才顯示箭頭（page flip 後維持 show）
   var pfLeft = document.getElementById('drag-arrow-left');
   var pfRight = document.getElementById('drag-arrow-right');
   if (pfLeft && pfRight) {
-    pfLeft.classList.toggle('show', totalPages > 1);
-    pfRight.classList.toggle('show', totalPages > 1);
+    pfLeft.classList.toggle('show', totalPages > 1 && !!draggedItem);
+    pfRight.classList.toggle('show', totalPages > 1 && !!draggedItem);
   }
 
   // 啟用拖曳排序（只有登入用戶）
@@ -3172,21 +3202,38 @@ window.openBackendSettings = function() {
           }
           h += '</div></div></label>';
         }
+        if (isSuperAdmin || canEdit('dragArrowIcon')) {
+          var currentIconType = bs.dragArrowIcon || 'chevron';
+          var iconOpts = [{t:'chevron',l:'細緻'},{t:'triangle',l:'實心'},{t:'angle',l:'簡約'},{t:'double',l:'雙層'}];
+          h += '<label style="display:block;margin-bottom:12px;font-size:.85rem">29. 箭頭樣式：<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">';
+          for (var ik=0;ik<iconOpts.length;ik++){
+            var io=iconOpts[ik];
+            var isSel=io.t===currentIconType;
+            h+='<div data-icon="'+io.t+'" onclick="this.parentNode.querySelectorAll(\'[data-icon]\').forEach(function(d){d.style.borderColor=\'var(--border-g)\';d.style.background=\'var(--bg2)\'});this.style.borderColor=\'var(--gold)\';this.style.background=\'rgba(201,150,58,0.1)\';document.getElementById(\'bs-arrow-icon\').value=\''+io.t+'\'" style="width:52px;text-align:center;cursor:pointer;border:1px solid '+(isSel?'var(--gold)':'var(--border-g)')+';border-radius:6px;background:'+(isSel?'rgba(201,150,58,0.1)':'var(--bg2)')+';padding:5px 4px">';
+            h+='<svg width="24" height="36" viewBox="0 0 40 60" style="color:var(--gold);display:block;margin:0 auto">';
+            if(io.t==='chevron')h+='<polyline points="24,15 13,30 24,45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="13" y1="30" x2="30" y2="30" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.35"/>';
+            if(io.t==='triangle')h+='<polygon points="28,12 12,30 28,48" fill="currentColor"/>';
+            if(io.t==='angle')h+='<polyline points="26,18 14,30 26,42" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+            if(io.t==='double')h+='<polyline points="28,15 18,30 28,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="20,15 10,30 20,45" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+            h+='</svg><div style="font-size:.6rem;color:var(--t3);margin-top:3px">'+io.l+'</div></div>';
+          }
+          h+='</div><input type="hidden" id="bs-arrow-icon" value="'+currentIconType+'"></label>';
+        }
         if (isSuperAdmin || canEdit('dragArrowSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 箭頭透明度（0-1）：<input id="bs-arrow-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowOpacity||0.4) + '" placeholder="0.4"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 箭頭透明度（0-1）：<input id="bs-arrow-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowOpacity||0.4) + '" placeholder="0.4"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 拖曳到箭頭時透明度（0-1）：<input id="bs-arrow-hover-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowHoverOpacity||0.9) + '" placeholder="0.9"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">32. 拖曳到箭頭時透明度（0-1）：<input id="bs-arrow-hover-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowHoverOpacity||0.9) + '" placeholder="0.9"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowCooldown')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">32. 翻頁冷卻時間（毫秒）：<input id="bs-arrow-cooldown" class="swal2-input" style="margin-top:4px" type="number" min="100" max="1000" step="50" value="' + (bs.dragArrowCooldown||300) + '" placeholder="300"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">33. 翻頁冷卻時間（毫秒）：<input id="bs-arrow-cooldown" class="swal2-input" style="margin-top:4px" type="number" min="100" max="1000" step="50" value="' + (bs.dragArrowCooldown||300) + '" placeholder="300"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳翻頁後的冷卻時間（100-1000 毫秒）</small>';
         }
         if (isSuperAdmin || canEdit('dragArrowActiveGlow')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">33. 拖曳到箭頭時發光強度（px）：<input id="bs-arrow-active-glow" class="swal2-input" style="margin-top:4px" type="number" min="0" max="60" step="2" value="' + (bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20) + '" placeholder="20"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">34. 拖曳到箭頭時發光強度（px）：<input id="bs-arrow-active-glow" class="swal2-input" style="margin-top:4px" type="number" min="0" max="60" step="2" value="' + (bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20) + '" placeholder="20"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳影片靠近箭頭時的光暈半徑，0 為無發光（0-60 px）</small>';
         }
       }
@@ -3194,19 +3241,19 @@ window.openBackendSettings = function() {
       // ─── 11. 社群連結 ───
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 社群連結</h3>';
       if (isSuperAdmin || canEdit('socialFacebook')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">34. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">35. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialInstagram')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">35. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">36. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialThreads')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">36. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">37. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialYoutube')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">37. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">38. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialLine')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">38. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">39. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
 
       // ─── 12. 聯絡資訊 ───
@@ -3214,10 +3261,10 @@ window.openBackendSettings = function() {
       if (hasContactPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 聯絡資訊</h3>';
         if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">41. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
       }
 
@@ -3226,16 +3273,16 @@ window.openBackendSettings = function() {
       if (hasRipplePermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 點擊光暈效果</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">41. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">42. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">42. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">43. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">43. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">44. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">44. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">45. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
 
@@ -3244,14 +3291,14 @@ window.openBackendSettings = function() {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">45. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">46. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">46. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">47. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定（10-600 秒）</small>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">47. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">48. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
       }
 
@@ -3430,6 +3477,10 @@ window.openBackendSettings = function() {
         var el = document.getElementById('bs-arrow-color');
         if (el) v.dragArrowColor = el.value;
       }
+      if (isSuperAdmin || canEdit('dragArrowIcon')) {
+        var el = document.getElementById('bs-arrow-icon');
+        if (el) v.dragArrowIcon = el.value;
+      }
       if (isSuperAdmin || canEdit('dragArrowSize')) {
         var el = document.getElementById('bs-arrow-size');
         if (el) v.dragArrowSize = el.value;
@@ -3527,6 +3578,7 @@ window.openBackendSettings = function() {
       if (v.pfGlowBrightness !== undefined) D.backendSettings.pfGlowBrightness = parseFloat(v.pfGlowBrightness);
       if (v.pfGlowSoftness !== undefined) D.backendSettings.pfGlowSoftness = parseFloat(v.pfGlowSoftness);
       if (v.dragArrowColor !== undefined) D.backendSettings.dragArrowColor = v.dragArrowColor;
+      if (v.dragArrowIcon !== undefined) D.backendSettings.dragArrowIcon = v.dragArrowIcon;
       if (v.dragArrowSize !== undefined) D.backendSettings.dragArrowSize = parseInt(v.dragArrowSize);
       if (v.dragArrowOpacity !== undefined) D.backendSettings.dragArrowOpacity = parseFloat(v.dragArrowOpacity);
       if (v.dragArrowHoverOpacity !== undefined) D.backendSettings.dragArrowHoverOpacity = parseFloat(v.dragArrowHoverOpacity);
@@ -3544,17 +3596,18 @@ window.openBackendSettings = function() {
       updateDOM();
       if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
       if (typeof applyDragGlowStyles === 'function') applyDragGlowStyles();
+      if (typeof updateDragArrowIcons === 'function') updateDragArrowIcons();
 
-      // 若箭頭未顯示（單頁），短暫預覽讓用戶確認設定效果
+      // 短暫顯示箭頭讓用戶確認設定效果（3秒後自動隱藏）
       (function() {
         var pl = document.getElementById('drag-arrow-left');
         var pr = document.getElementById('drag-arrow-right');
-        if (pl && pr && !pl.classList.contains('show')) {
+        if (pl && pr) {
           positionDragArrows();
           pl.classList.add('show'); pr.classList.add('show');
           setTimeout(function() {
             if (!draggedItem) { pl.classList.remove('show'); pr.classList.remove('show'); }
-          }, 2000);
+          }, 3000);
         }
       })();
 
