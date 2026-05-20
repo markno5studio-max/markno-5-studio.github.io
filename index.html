@@ -416,6 +416,7 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 
 /* 拖曳中的作品卡片金色框線 + 發光 */
 .pf-item.dragging{outline:3px solid var(--gold)!important;box-shadow:0 0 28px rgba(201,150,58,0.75),0 0 56px rgba(201,150,58,0.4)!important;z-index:20;transform:scale(1.02)}
+.pf-item.drag-over{outline:3px solid var(--gold)!important;box-shadow:0 0 20px rgba(201,150,58,0.6)!important}
 
 </style>
 </head>
@@ -780,7 +781,12 @@ var DEF = {
     dragArrowOpacity: 0.4,
     dragArrowHoverOpacity: 0.9,
     dragArrowCooldown: 300,
-    dragArrowActiveGlow: 20
+    dragArrowActiveGlow: 20,
+    pfGlowColor: '#C9963A',
+    pfGlowSize: 28,
+    pfGlowRange: 56,
+    pfGlowBrightness: 0.75,
+    pfGlowSoftness: 0.4
   },
   gmailUrl: 'https://mail.google.com/mail/u/2/#inbox',
   mailToAddress: '',
@@ -802,7 +808,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -813,6 +819,7 @@ var EDITABLE_NAMES = {
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
   dragArrowColor:'拖曳箭頭顏色',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
+  pfGlowColor:'拖曳發光顏色',pfGlowSize:'拖曳發光大小',pfGlowRange:'拖曳發光範圍',pfGlowBrightness:'拖曳發光明亮',pfGlowSoftness:'拖曳發光柔化',
   autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
 
@@ -1266,6 +1273,32 @@ function applyDragArrowStyles() {
   document.head.appendChild(st);
 }
 
+function applyDragGlowStyles() {
+  var bs = D.backendSettings || {};
+  var color = bs.pfGlowColor || '#C9963A';
+  var size = bs.pfGlowSize !== undefined ? bs.pfGlowSize : 28;
+  var range = bs.pfGlowRange !== undefined ? bs.pfGlowRange : 56;
+  var brightness = bs.pfGlowBrightness !== undefined ? bs.pfGlowBrightness : 0.75;
+  var softness = bs.pfGlowSoftness !== undefined ? bs.pfGlowSoftness : 0.4;
+
+  var r = parseInt(color.slice(1,3),16)||201;
+  var g = parseInt(color.slice(3,5),16)||150;
+  var b = parseInt(color.slice(5,7),16)||58;
+
+  var styleId = 'drag-glow-style';
+  var existing = document.getElementById(styleId);
+  if (existing) existing.remove();
+
+  var st = document.createElement('style');
+  st.id = styleId;
+  st.textContent =
+    '.pf-item.dragging{outline:3px solid ' + color + '!important;' +
+    'box-shadow:0 0 ' + size + 'px rgba(' + r + ',' + g + ',' + b + ',' + brightness + '),0 0 ' + range + 'px rgba(' + r + ',' + g + ',' + b + ',' + softness + ')!important;z-index:20;transform:scale(1.02)}' +
+    '.pf-item.drag-over{outline:3px solid ' + color + '!important;' +
+    'box-shadow:0 0 ' + Math.round(size*0.7) + 'px rgba(' + r + ',' + g + ',' + b + ',' + (softness*1.2).toFixed(2) + ')!important}';
+  document.head.appendChild(st);
+}
+
 function positionDragArrows() {
   var grid = document.getElementById('portfolio-list');
   var leftArrow = document.getElementById('drag-arrow-left');
@@ -1307,6 +1340,7 @@ function initPage() {
   initWeather();
   initAdminBarHover();
   applyDragArrowStyles();
+  applyDragGlowStyles();
 }
 
 /* ============================================================
@@ -1762,11 +1796,12 @@ var draggedItem = null;
 var draggedIndex = -1;
 var autoScrollTimer = null;
 var lastScrollDirection = null;
+var lastDragOverItem = null;
 
 function handleDragStart(e) {
   draggedItem = this;
   draggedIndex = parseInt(this.dataset.index);
-  this.style.opacity = '0.5';
+  this.style.opacity = '0.9';
   this.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
 
@@ -1834,20 +1869,21 @@ function handleDragOver(e) {
 
 function handleDragEnter(e) {
   if (this !== draggedItem) {
-    this.style.border = '3px solid var(--gold)';
-    this.style.boxShadow = '0 0 12px var(--gold)';
+    if (lastDragOverItem && lastDragOverItem !== this) {
+      lastDragOverItem.classList.remove('drag-over');
+    }
+    this.classList.add('drag-over');
+    lastDragOverItem = this;
   }
 }
 
 function handleDragLeave(e) {
-  this.style.border = '';
-  this.style.boxShadow = '';
+  // 拖曳離開時保留發光，直到拖曳到新位置或結束
 }
 
 function handleDrop(e) {
   if (e.stopPropagation) e.stopPropagation();
-  this.style.border = '';
-  this.style.boxShadow = '';
+  if (lastDragOverItem) { lastDragOverItem.classList.remove('drag-over'); lastDragOverItem = null; }
   
   // 清除翻頁計時器
   if (autoScrollTimer) {
@@ -1881,6 +1917,9 @@ function handleDragEnd(e) {
     item.style.boxShadow = '';
     item.classList.remove('dragging');
   });
+
+  // 清除拖曳目標發光
+  if (lastDragOverItem) { lastDragOverItem.classList.remove('drag-over'); lastDragOverItem = null; }
 
   // 清除箭頭 edge-hover 樣式（保留 show，由 renderPF 管理）
   var leftArrow = document.getElementById('drag-arrow-left');
@@ -1958,6 +1997,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   setupArrowDragNav(arrowLeft, -1);
   setupArrowDragNav(arrowRight, 1);
+
+  // 捲動時重新定位箭頭，維持在作品集欄位正中間
+  window.addEventListener('scroll', function() {
+    var pfSection = document.getElementById('portfolio');
+    if (!pfSection) return;
+    var r = pfSection.getBoundingClientRect();
+    if (r.bottom > 0 && r.top < window.innerHeight) positionDragArrows();
+  }, { passive: true });
 });
 
 function renderPF() {
@@ -3079,10 +3126,41 @@ window.openBackendSettings = function() {
       // ─── 10. 拖曳箭頭設定 ───
       var hasArrowPermission = isSuperAdmin || canEdit('dragArrowColor') || canEdit('dragArrowSize') || canEdit('dragArrowOpacity') || canEdit('dragArrowHoverOpacity') || canEdit('dragArrowCooldown') || canEdit('dragArrowActiveGlow');
       if (hasArrowPermission) {
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 作品拖曳發光效果</h3>';
+        var hasGlowPermission = isSuperAdmin || canEdit('pfGlowColor') || canEdit('pfGlowSize') || canEdit('pfGlowRange') || canEdit('pfGlowBrightness') || canEdit('pfGlowSoftness');
+        if (hasGlowPermission) {
+          if (isSuperAdmin || canEdit('pfGlowColor')) {
+            var pfGlowColorVal = (bs.pfGlowColor || '#C9963A');
+            h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 拖曳發光顏色：';
+            h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+            h += '<div id="bs-pf-glow-swatch" style="width:50px;height:40px;border-radius:4px;border:1px solid var(--border-g);background:' + pfGlowColorVal + ';flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)"></div>';
+            h += '<input id="bs-pf-glow-color" type="text" style="margin:0;width:88px;background:var(--bg2);border:1px solid var(--border-g);color:var(--t1);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:.85rem;outline:none" value="' + pfGlowColorVal + '" maxlength="7" placeholder="#C9963A" oninput="var s=document.getElementById(\'bs-pf-glow-swatch\');if(s&&/^#[0-9a-fA-F]{6}$/.test(this.value))s.style.background=this.value">';
+            h += '<div style="display:flex;gap:5px;flex-wrap:wrap">';
+            var pgPresets = ['#C9963A','#E4B86A','#FFFFFF','#F0EBE2','#888888','#B52020'];
+            for (var pgi = 0; pgi < pgPresets.length; pgi++) {
+              var pgc = pgPresets[pgi];
+              h += '<div onclick="document.getElementById(\'bs-pf-glow-color\').value=\'' + pgc + '\';document.getElementById(\'bs-pf-glow-swatch\').style.background=\'' + pgc + '\'" style="width:24px;height:24px;background:' + pgc + ';border-radius:3px;cursor:pointer;border:1px solid rgba(255,255,255,0.2);transition:transform .1s" onmouseover="this.style.transform=\'scale(1.2)\'" onmouseout="this.style.transform=\'\'" title="' + pgc + '"></div>';
+            }
+            h += '</div></div></label>';
+          }
+          if (isSuperAdmin || canEdit('pfGlowSize')) {
+            h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 發光大小（px）：<input id="bs-pf-glow-size" class="swal2-input" style="margin-top:4px" type="number" min="0" max="120" value="' + (bs.pfGlowSize !== undefined ? bs.pfGlowSize : 28) + '" placeholder="28"></label>';
+          }
+          if (isSuperAdmin || canEdit('pfGlowRange')) {
+            h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 發光範圍（px）：<input id="bs-pf-glow-range" class="swal2-input" style="margin-top:4px" type="number" min="0" max="200" value="' + (bs.pfGlowRange !== undefined ? bs.pfGlowRange : 56) + '" placeholder="56"></label>';
+          }
+          if (isSuperAdmin || canEdit('pfGlowBrightness')) {
+            h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 發光明亮（0-1）：<input id="bs-pf-glow-brightness" class="swal2-input" style="margin-top:4px" type="number" step="0.05" min="0" max="1" value="' + (bs.pfGlowBrightness !== undefined ? bs.pfGlowBrightness : 0.75) + '" placeholder="0.75"></label>';
+          }
+          if (isSuperAdmin || canEdit('pfGlowSoftness')) {
+            h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 發光柔化（0-1）：<input id="bs-pf-glow-softness" class="swal2-input" style="margin-top:4px" type="number" step="0.05" min="0" max="1" value="' + (bs.pfGlowSoftness !== undefined ? bs.pfGlowSoftness : 0.4) + '" placeholder="0.4"></label>';
+            h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：數字越小外層光暈越柔和</small>';
+          }
+        }
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 作品集翻頁箭頭</h3>';
         if (isSuperAdmin || canEdit('dragArrowColor')) {
           var arrowColor = bs.dragArrowColor || '#C9963A';
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">23. 箭頭顏色：';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 箭頭顏色：';
           h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
           h += '<div id="bs-arrow-swatch" style="width:50px;height:40px;border-radius:4px;border:1px solid var(--border-g);background:' + arrowColor + ';flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)"></div>';
           h += '<input id="bs-arrow-color" type="text" style="margin:0;width:88px;background:var(--bg2);border:1px solid var(--border-g);color:var(--t1);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:.85rem;outline:none" value="' + arrowColor + '" maxlength="7" placeholder="#C9963A" oninput="var s=document.getElementById(\'bs-arrow-swatch\');if(s&&/^#[0-9a-fA-F]{6}$/.test(this.value))s.style.background=this.value">';
@@ -3095,20 +3173,20 @@ window.openBackendSettings = function() {
           h += '</div></div></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">24. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">29. 箭頭大小（px）：<input id="bs-arrow-size" class="swal2-input" style="margin-top:4px" type="number" min="30" max="120" value="' + (bs.dragArrowSize||60) + '" placeholder="60"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">25. 箭頭透明度（0-1）：<input id="bs-arrow-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowOpacity||0.4) + '" placeholder="0.4"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">30. 箭頭透明度（0-1）：<input id="bs-arrow-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowOpacity||0.4) + '" placeholder="0.4"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowHoverOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">26. 拖曳到箭頭時透明度（0-1）：<input id="bs-arrow-hover-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowHoverOpacity||0.9) + '" placeholder="0.9"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">31. 拖曳到箭頭時透明度（0-1）：<input id="bs-arrow-hover-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (bs.dragArrowHoverOpacity||0.9) + '" placeholder="0.9"></label>';
         }
         if (isSuperAdmin || canEdit('dragArrowCooldown')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">27. 翻頁冷卻時間（毫秒）：<input id="bs-arrow-cooldown" class="swal2-input" style="margin-top:4px" type="number" min="100" max="1000" step="50" value="' + (bs.dragArrowCooldown||300) + '" placeholder="300"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">32. 翻頁冷卻時間（毫秒）：<input id="bs-arrow-cooldown" class="swal2-input" style="margin-top:4px" type="number" min="100" max="1000" step="50" value="' + (bs.dragArrowCooldown||300) + '" placeholder="300"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳翻頁後的冷卻時間（100-1000 毫秒）</small>';
         }
         if (isSuperAdmin || canEdit('dragArrowActiveGlow')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">28. 拖曳到箭頭時發光強度（px）：<input id="bs-arrow-active-glow" class="swal2-input" style="margin-top:4px" type="number" min="0" max="60" step="2" value="' + (bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20) + '" placeholder="20"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">33. 拖曳到箭頭時發光強度（px）：<input id="bs-arrow-active-glow" class="swal2-input" style="margin-top:4px" type="number" min="0" max="60" step="2" value="' + (bs.dragArrowActiveGlow !== undefined ? bs.dragArrowActiveGlow : 20) + '" placeholder="20"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：拖曳影片靠近箭頭時的光暈半徑，0 為無發光（0-60 px）</small>';
         }
       }
@@ -3116,19 +3194,19 @@ window.openBackendSettings = function() {
       // ─── 11. 社群連結 ───
       h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 社群連結</h3>';
       if (isSuperAdmin || canEdit('socialFacebook')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">29. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">34. Facebook：</span><input id="bs-fb-link" class="swal2-input" style="margin:0" value="' + (social.facebookLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-fb-show" ' + (social.facebookShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialInstagram')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">30. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">35. Instagram：</span><input id="bs-ig-link" class="swal2-input" style="margin:0" value="' + (social.instagramLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-ig-show" ' + (social.instagramShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialThreads')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">31. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">36. Threads：</span><input id="bs-threads-link" class="swal2-input" style="margin:0" value="' + (social.threadsLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-threads-show" ' + (social.threadsShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialYoutube')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">32. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">37. YouTube：</span><input id="bs-youtube-link" class="swal2-input" style="margin:0" value="' + (social.youtubeLink||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-youtube-show" ' + (social.youtubeShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
       if (isSuperAdmin || canEdit('socialLine')) {
-        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">33. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
+        h += '<div style="margin-bottom:10px"><div style="display:flex;gap:10px;align-items:end"><label style="flex:1"><span style="display:block;margin-bottom:4px;font-size:.85rem">38. LINE ID：</span><input id="bs-line-id" class="swal2-input" style="margin:0" value="' + (social.lineId||'') + '"></label><label style="white-space:nowrap;padding-bottom:8px"><input type="checkbox" id="bs-line-show" ' + (social.lineShow !== false ? 'checked' : '') + '> 顯示</label></div></div>';
       }
 
       // ─── 12. 聯絡資訊 ───
@@ -3136,10 +3214,10 @@ window.openBackendSettings = function() {
       if (hasContactPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 聯絡資訊</h3>';
         if (isSuperAdmin || canEdit('contactEmail')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">34. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 聯絡資訊 Email：<input id="bs-contact-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="markno.5.studio@gmail.com"></label>';
         }
         if (isSuperAdmin || canEdit('email')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">35. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 發送訊息 Email：<input id="bs-send-email" class="swal2-input" style="margin-top:4px" type="email" value="' + (D.contactEmail||'') + '" placeholder="your@email.com"></label>';
         }
       }
 
@@ -3148,16 +3226,16 @@ window.openBackendSettings = function() {
       if (hasRipplePermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 點擊光暈效果</h3>';
         if (isSuperAdmin || canEdit('rippleColor')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">36. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">41. 光暈顏色：<input id="bs-ripple-color" class="swal2-input" style="margin-top:4px" value="' + (t.rippleColor||'') + '" placeholder="#C9963A"></label>';
         }
         if (isSuperAdmin || canEdit('rippleOpacity')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">37. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">42. 光暈亮度：<input id="bs-ripple-opacity" class="swal2-input" style="margin-top:4px" type="number" step="0.1" min="0" max="1" value="' + (t.rippleOpacity||'') + '" placeholder="0.35"></label>';
         }
         if (isSuperAdmin || canEdit('rippleSize')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">38. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">43. 光暈大小：<input id="bs-ripple-size" class="swal2-input" style="margin-top:4px" value="' + (t.rippleSize||'') + '" placeholder="160px"></label>';
         }
         if (isSuperAdmin || canEdit('rippleWidth')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">39. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">44. 光暈粗細：<input id="bs-ripple-width" class="swal2-input" style="margin-top:4px" value="' + (t.rippleWidth||'') + '" placeholder="3px"></label>';
         }
       }
 
@@ -3166,14 +3244,14 @@ window.openBackendSettings = function() {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">40. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">45. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">41. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">46. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
           h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:-6px;margin-bottom:10px">提示：靜置指定秒數後自動儲存設定（10-600 秒）</small>';
         }
         if (isSuperAdmin || canEdit('copyright')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">42. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
+          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">47. 版權模板：<input id="bs-copyright" class="swal2-input" style="margin-top:4px" value="' + (bs.copyrightTemplate||'') + '" placeholder="© YEAR MARK NO.5 VIDEO STUDIO"></label>';
         }
       }
 
@@ -3325,6 +3403,28 @@ window.openBackendSettings = function() {
         if (el) v.procNumHoverOpacity = el.value;
       }
       
+      // 拖曳發光設定
+      if (isSuperAdmin || canEdit('pfGlowColor')) {
+        var el = document.getElementById('bs-pf-glow-color');
+        if (el) v.pfGlowColor = el.value;
+      }
+      if (isSuperAdmin || canEdit('pfGlowSize')) {
+        var el = document.getElementById('bs-pf-glow-size');
+        if (el) v.pfGlowSize = el.value;
+      }
+      if (isSuperAdmin || canEdit('pfGlowRange')) {
+        var el = document.getElementById('bs-pf-glow-range');
+        if (el) v.pfGlowRange = el.value;
+      }
+      if (isSuperAdmin || canEdit('pfGlowBrightness')) {
+        var el = document.getElementById('bs-pf-glow-brightness');
+        if (el) v.pfGlowBrightness = el.value;
+      }
+      if (isSuperAdmin || canEdit('pfGlowSoftness')) {
+        var el = document.getElementById('bs-pf-glow-softness');
+        if (el) v.pfGlowSoftness = el.value;
+      }
+
       // 拖曳箭頭設定
       if (isSuperAdmin || canEdit('dragArrowColor')) {
         var el = document.getElementById('bs-arrow-color');
@@ -3421,6 +3521,11 @@ window.openBackendSettings = function() {
       
       // 更新系統設定
       if (!D.backendSettings) D.backendSettings = {};
+      if (v.pfGlowColor !== undefined) D.backendSettings.pfGlowColor = v.pfGlowColor;
+      if (v.pfGlowSize !== undefined) D.backendSettings.pfGlowSize = parseInt(v.pfGlowSize);
+      if (v.pfGlowRange !== undefined) D.backendSettings.pfGlowRange = parseInt(v.pfGlowRange);
+      if (v.pfGlowBrightness !== undefined) D.backendSettings.pfGlowBrightness = parseFloat(v.pfGlowBrightness);
+      if (v.pfGlowSoftness !== undefined) D.backendSettings.pfGlowSoftness = parseFloat(v.pfGlowSoftness);
       if (v.dragArrowColor !== undefined) D.backendSettings.dragArrowColor = v.dragArrowColor;
       if (v.dragArrowSize !== undefined) D.backendSettings.dragArrowSize = parseInt(v.dragArrowSize);
       if (v.dragArrowOpacity !== undefined) D.backendSettings.dragArrowOpacity = parseFloat(v.dragArrowOpacity);
@@ -3438,6 +3543,7 @@ window.openBackendSettings = function() {
       applyTheme();
       updateDOM();
       if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
+      if (typeof applyDragGlowStyles === 'function') applyDragGlowStyles();
 
       // 若箭頭未顯示（單頁），短暫預覽讓用戶確認設定效果
       (function() {
