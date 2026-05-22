@@ -2,13 +2,24 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.22.03';
+const SITE_VERSION = '2026.05.23.01';
 
 /* ============================================================
    STORAGE KEY
 ============================================================ */
 
 var KEY = 'MK5_DATA'; // 固定 key，不隨版本改變，避免資料遺失
+
+/* ============================================================
+   CLOUD SYNC CONFIG（雲端同步，存於管理員裝置的 localStorage）
+============================================================ */
+var CLOUD = (function() {
+  try {
+    var s = localStorage.getItem('MK5_CLOUD');
+    return s ? Object.assign({ token:'', owner:'', repo:'', branch:'main' }, JSON.parse(s))
+             : { token:'', owner:'', repo:'', branch:'main' };
+  } catch(e) { return { token:'', owner:'', repo:'', branch:'main' }; }
+})();
 
 /* ============================================================
    FORCE CLEAR OLD CACHE
@@ -456,6 +467,8 @@ document.addEventListener('DOMContentLoaded', function() {
   updateDOM();
   runIntro();
   bindEvents();
+  // ☁️ 非同步從 GitHub 拉取最新內容（不阻擋初始渲染）
+  setTimeout(function() { cloudPull(); }, 800);
   
   // ESC 鍵關閉影片 modal
   document.addEventListener('keydown', function(e) {
@@ -586,57 +599,279 @@ function mergePublishedContent() {
 /* ============================================================
    GENERATE PUBLISH FILE（生成 content.js，讓手機也能看到最新內容）
 ============================================================ */
+// 備用：手動下載 content.js（無法設定 GitHub Token 時使用）
 window.generatePublishFile = function() {
   if (!CU || CU.role !== 'super_admin') {
-    Swal.fire({ title: '無權限', text: '只有超級執行長才能發布網站內容', icon: 'error' });
+    Swal.fire({ title: '無權限', text: '只有超級執行長才能執行此操作', icon: 'error' });
     return;
   }
-
-  // 建立發布資料（排除敏感資料）
-  var published = JSON.parse(JSON.stringify(D));
-  delete published.users;
-  delete published.inbox;
-  delete published.analytics;
-  delete published.editLog;
-  published._publishedAt = new Date().toISOString();
-
-  var json = JSON.stringify(published, null, 2);
+  var pub  = buildPublishData();
   var date = new Date().toLocaleString('zh-TW');
-
   var jsContent =
     '/* ================================================================\n' +
     '   馬克伍號影像工作室 - 發布內容 (content.js)\n' +
     '   發布時間：' + date + '\n' +
-    '   ⚠ 此檔案由後台「📤 發布到網站」自動生成，請勿手動修改\n' +
-    '   ✅ 將此檔案部署到 GitHub 後，所有裝置（含手機）將自動看到最新內容\n' +
+    '   ⚠ 此檔案由後台自動生成，請勿手動修改\n' +
     '================================================================ */\n\n' +
-    'window.MK5_PUBLISHED = ' + json + ';\n';
-
+    'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
   var blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'content.js';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = 'content.js';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  Swal.fire({ title: '📥 content.js 已下載', text: '請將此檔案上傳到 GitHub 以同步到所有裝置', icon: 'success', timer: 3000, showConfirmButton: false });
+};
 
-  Swal.fire({
-    title: '📤 content.js 已生成',
-    html: '<div style="text-align:left;line-height:1.9;font-size:.9rem">' +
-          '下載完成！請依以下步驟讓手機看到最新內容：<br><br>' +
-          '<ol style="padding-left:20px;margin:0">' +
-          '<li>將 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">content.js</code> 放到網站根目錄（與 index.html 同層）</li>' +
-          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git add content.js</code></li>' +
-          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git commit -m "📤 發布最新內容"</code></li>' +
-          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git push</code></li>' +
-          '<li>等待約 1~3 分鐘，所有裝置將自動看到最新內容 ✅</li>' +
-          '</ol></div>',
-    icon: 'success',
-    confirmButtonText: '✅ 了解',
-    width: 560
-  });
+/* ============================================================
+   BUILD PUBLISH DATA（建立可發布的公開資料，排除敏感資訊）
+============================================================ */
+function buildPublishData() {
+  var pub = JSON.parse(JSON.stringify(D));
+  delete pub.users;
+  delete pub.inbox;
+  delete pub.analytics;
+  delete pub.editLog;
+  pub._publishedAt = new Date().toISOString();
+  // 將雲端來源資訊寫入，讓所有裝置知道從哪裡拉取最新資料
+  if (CLOUD.owner && CLOUD.repo) {
+    pub._cloudOwner  = CLOUD.owner;
+    pub._cloudRepo   = CLOUD.repo;
+    pub._cloudBranch = CLOUD.branch || 'main';
+  }
+  return pub;
+}
+
+/* ============================================================
+   CLOUD PUSH（儲存時自動同步到 GitHub，更新 content.js）
+============================================================ */
+async function cloudPush(silent) {
+  if (!CLOUD.token || !CLOUD.owner || !CLOUD.repo) {
+    if (!silent) {
+      Swal.fire({
+        title: '☁️ 尚未設定雲端同步',
+        html: '請到「⚙️ 後台設定」→ 最下方「☁️ 雲端同步設定」，<br>填入 GitHub 資訊後即可自動同步。',
+        icon: 'info'
+      });
+    }
+    return false;
+  }
+
+  var branch  = CLOUD.branch || 'main';
+  var apiUrl  = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
+  var headers = {
+    'Authorization': 'token ' + CLOUD.token,
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json'
+  };
+
+  // 更新管理列顯示
+  showSyncStatus('☁️ 同步中…', 'syncing');
+
+  try {
+    // 1. 取得目前檔案的 SHA（更新檔案時必須）
+    var sha = null;
+    var shaRes = await fetch(apiUrl + '?ref=' + branch, { headers: headers });
+    if (shaRes.ok) {
+      var shaData = await shaRes.json();
+      sha = shaData.sha;
+    } else if (shaRes.status !== 404) {
+      throw new Error('無法取得檔案資訊（HTTP ' + shaRes.status + '）');
+    }
+
+    // 2. 產生 content.js 內容
+    var pub      = buildPublishData();
+    var date     = new Date().toLocaleString('zh-TW');
+    var jsContent =
+      '/* ================================================================\n' +
+      '   馬克伍號影像工作室 - 發布內容 (content.js)\n' +
+      '   發布時間：' + date + '\n' +
+      '   ⚠ 此檔案由後台「💾 儲存」時自動同步，請勿手動修改\n' +
+      '   ✅ 所有裝置重新整理後即可看到最新內容\n' +
+      '================================================================ */\n\n' +
+      'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
+
+    // 3. Base64 編碼（處理 UTF-8 中文）
+    var encoded = btoa(unescape(encodeURIComponent(jsContent)));
+
+    // 4. 上傳到 GitHub
+    var body = { message: '☁️ 自動同步內容 ' + date, content: encoded, branch: branch };
+    if (sha) body.sha = sha;
+
+    var res = await fetch(apiUrl, { method: 'PUT', headers: headers, body: JSON.stringify(body) });
+
+    if (!res.ok) {
+      var errData = {};
+      try { errData = await res.json(); } catch(e) {}
+      throw new Error(errData.message || 'HTTP ' + res.status);
+    }
+
+    // 5. 更新本地時間戳
+    D._publishedAt = pub._publishedAt;
+    // 同時更新 window.MK5_PUBLISHED 供 cloudPull 比對
+    window.MK5_PUBLISHED = pub;
+    PUBLISHED_AT = pub._publishedAt;
+    persist();
+
+    showSyncStatus('☁️ 已同步', 'success');
+    if (!silent) {
+      Swal.fire({
+        title: '☁️ 同步成功！',
+        html: '內容已自動上傳到 GitHub<br><small style="color:var(--t3)">手機重新整理即可看到最新內容 ✅</small>',
+        icon: 'success', timer: 2500, showConfirmButton: false
+      });
+    }
+    return true;
+
+  } catch(e) {
+    console.error('cloudPush 失敗：', e);
+    showSyncStatus('⚠️ 同步失敗', 'error');
+    if (!silent) {
+      Swal.fire({
+        title: '☁️ 同步失敗',
+        html: '<b>' + (e.message || '未知錯誤') + '</b><br><small>請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確</small>',
+        icon: 'error'
+      });
+    }
+    return false;
+  }
+}
+
+/* ============================================================
+   CLOUD PULL（頁面載入時從 GitHub API 拉取最新 content.js）
+============================================================ */
+async function cloudPull() {
+  // 從 content.js 或 CLOUD 設定取得來源資訊
+  var owner  = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudOwner)  || CLOUD.owner;
+  var repo   = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudRepo)   || CLOUD.repo;
+  var branch = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudBranch) || CLOUD.branch || 'main';
+
+  if (!owner || !repo) return; // 尚未設定，跳過
+
+  // Session 快取（3 分鐘內不重複請求）
+  var cacheKey = 'MK5_PULL_' + owner + '_' + repo + '_' + branch;
+  try {
+    var cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      var cObj = JSON.parse(cached);
+      if (Date.now() - (cObj._cachedAt || 0) < 3 * 60 * 1000) {
+        if (cObj._publishedAt && cObj._publishedAt > (D._publishedAt || '')) {
+          window.MK5_PUBLISHED = cObj;
+          PUBLISHED_AT = cObj._publishedAt;
+          mergePublishedContent();
+          updateDOM();
+        }
+        return;
+      }
+    }
+  } catch(e) {}
+
+  var apiUrl  = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/content.js?ref=' + branch;
+  var headers = { 'Accept': 'application/vnd.github.v3+json' };
+  if (CLOUD.token) headers['Authorization'] = 'token ' + CLOUD.token;
+
+  try {
+    var res = await fetch(apiUrl, { headers: headers });
+    if (!res.ok) return;
+
+    var data = await res.json();
+    if (!data.content) return;
+
+    // 解碼 base64（GitHub API 回傳有換行符）
+    var decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+
+    // 從 JS 字串中抽取 JSON 物件
+    var match = decoded.match(/window\.MK5_PUBLISHED\s*=\s*(\{[\s\S]*?\});\s*$/);
+    if (!match) return;
+
+    var remote = JSON.parse(match[1]);
+
+    // 存入 session 快取
+    remote._cachedAt = Date.now();
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(remote)); } catch(e) {}
+
+    // 若遠端版本比本地新，套用並重繪
+    if (remote._publishedAt && remote._publishedAt > (D._publishedAt || '')) {
+      console.log('☁️ 已從 GitHub 同步最新內容（' + remote._publishedAt + '）');
+      window.MK5_PUBLISHED = remote;
+      PUBLISHED_AT = remote._publishedAt;
+      mergePublishedContent();
+      updateDOM();
+    }
+
+  } catch(e) {
+    console.log('cloudPull 失敗：', e.message);
+  }
+}
+
+/* ============================================================
+   SYNC STATUS BAR（管理列同步狀態提示）
+============================================================ */
+function showSyncStatus(msg, type) {
+  var el = document.getElementById('mk5-sync-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mk5-sync-status';
+    el.style.cssText =
+      'position:fixed;bottom:16px;right:16px;padding:7px 16px;border-radius:8px;' +
+      'font-size:.8rem;z-index:99999;transition:opacity .5s;pointer-events:none;' +
+      'backdrop-filter:blur(8px);font-weight:500;letter-spacing:.03em';
+    document.body.appendChild(el);
+  }
+  el.style.opacity = '1';
+  el.textContent = msg;
+  if (type === 'success') {
+    el.style.background  = 'rgba(0,160,80,0.18)';
+    el.style.border      = '1px solid rgba(74,222,128,0.45)';
+    el.style.color       = '#4ade80';
+  } else if (type === 'error') {
+    el.style.background  = 'rgba(181,32,32,0.18)';
+    el.style.border      = '1px solid rgba(248,113,113,0.45)';
+    el.style.color       = '#f87171';
+  } else { // syncing
+    el.style.background  = 'rgba(201,150,58,0.18)';
+    el.style.border      = '1px solid rgba(201,150,58,0.45)';
+    el.style.color       = '#C9963A';
+  }
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(function() {
+    el.style.opacity = '0';
+  }, type === 'success' ? 3000 : type === 'error' ? 6000 : 30000);
+}
+
+/* ============================================================
+   TEST CLOUD CONNECTION（測試 GitHub 連線）
+============================================================ */
+window.testCloudConnection = async function() {
+  var ownerEl  = document.getElementById('bs-cloud-owner');
+  var repoEl   = document.getElementById('bs-cloud-repo');
+  var tokenEl  = document.getElementById('bs-cloud-token');
+  if (!ownerEl || !repoEl || !tokenEl || !ownerEl.value.trim() || !repoEl.value.trim() || !tokenEl.value.trim()) {
+    Swal.fire({ title: '請先填入所有欄位', icon: 'warning', timer: 2000, showConfirmButton: false });
+    return;
+  }
+  var apiUrl = 'https://api.github.com/repos/' + ownerEl.value.trim() + '/' + repoEl.value.trim() + '/contents/content.js';
+  try {
+    var res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': 'token ' + tokenEl.value.trim(),
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (res.ok) {
+      Swal.fire({ title: '✅ 連線成功！', text: '已找到 content.js，可以正常同步', icon: 'success', timer: 2500, showConfirmButton: false });
+    } else if (res.status === 404) {
+      Swal.fire({ title: '✅ 連線成功！', text: '儲存庫已連通（content.js 尚不存在，首次儲存時會自動建立）', icon: 'success', timer: 3000, showConfirmButton: false });
+    } else if (res.status === 401) {
+      Swal.fire({ title: '❌ Token 無效', text: '請確認 GitHub Token 正確且未過期', icon: 'error' });
+    } else if (res.status === 403) {
+      Swal.fire({ title: '❌ 權限不足', text: 'Token 缺少 repo / contents:write 權限', icon: 'error' });
+    } else {
+      Swal.fire({ title: '❌ 連線失敗', text: 'HTTP ' + res.status + '，請確認用戶名稱與儲存庫名稱正確', icon: 'error' });
+    }
+  } catch(e) {
+    Swal.fire({ title: '❌ 網路錯誤', text: e.message, icon: 'error' });
+  }
 };
 
 function persist() {
@@ -1195,6 +1430,8 @@ window.saveChanges = function(showAlert) {
   }
   persist(); updateDOM();
   if (showAlert) Swal.fire({ title:'✓ 儲存成功', timer:1200, showConfirmButton:false, icon:'success' });
+  // ☁️ 自動同步到 GitHub（靜默模式，已設定時才執行）
+  if (CU && CLOUD.token && CLOUD.owner && CLOUD.repo) cloudPush(true);
 };
 
 /* ============================================================
@@ -2836,6 +3073,28 @@ window.openBackendSettings = function() {
         }
       }
 
+      // ─── 15. 雲端同步設定（super_admin 專用） ───
+      if (isSuperAdmin) {
+        var cloudOk = CLOUD.token && CLOUD.owner && CLOUD.repo;
+        var cloudStatus = cloudOk
+          ? '<span style="color:#4ade80">✅ 已設定（' + CLOUD.owner + '/' + CLOUD.repo + '）</span>'
+          : '<span style="color:var(--t3)">⚪ 尚未設定</span>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ ☁️ 雲端同步設定</h3>';
+        h += '<p style="font-size:.82rem;color:var(--t2);margin-bottom:14px;line-height:1.8">';
+        h += '設定後，每次點擊「💾 儲存」將自動把最新內容同步到 GitHub。<br>';
+        h += '其他裝置（手機等）重新整理網站即可看到最新資訊，無需手動操作。<br>';
+        h += '目前狀態：' + cloudStatus + '</p>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub Token（Personal Access Token）：<input id="bs-cloud-token" class="swal2-input" style="margin-top:4px" type="password" value="' + (CLOUD.token||'') + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password"></label>';
+        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-bottom:12px;line-height:1.7">';
+        h += '如何取得 Token：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>';
+        h += '需要勾選：Repository → Contents → Read and Write 權限<br>';
+        h += '<b style="color:var(--gold)">⚠ Token 僅儲存在此裝置，不會上傳到 GitHub</b></small>';
+        h += '<button type="button" onclick="testCloudConnection()" style="padding:7px 18px;background:var(--bg3);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s" onmouseover="this.style.background=\'rgba(201,150,58,0.15)\'" onmouseout="this.style.background=\'var(--bg3)\'">🔌 測試連線</button>';
+      }
+
       h += '</div>';
       return h;
     })(),
@@ -3123,7 +3382,20 @@ window.openBackendSettings = function() {
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
       if (v.contactEmail !== undefined) D.contactEmail = v.contactEmail;
-      
+
+      // ☁️ 雲端同步設定（只存在此裝置，不進入 D）
+      if (isSuperAdmin) {
+        var cOwner  = document.getElementById('bs-cloud-owner');
+        var cRepo   = document.getElementById('bs-cloud-repo');
+        var cBranch = document.getElementById('bs-cloud-branch');
+        var cToken  = document.getElementById('bs-cloud-token');
+        if (cOwner)  CLOUD.owner  = cOwner.value.trim();
+        if (cRepo)   CLOUD.repo   = cRepo.value.trim();
+        if (cBranch) CLOUD.branch = cBranch.value.trim() || 'main';
+        if (cToken)  CLOUD.token  = cToken.value.trim();
+        try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
+      }
+
       logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
       persist();
       applyTheme();
@@ -3150,8 +3422,10 @@ window.openBackendSettings = function() {
         startAutoLogout();
         startAutoSave();
       }
-      
+
       Swal.fire({title:'✅ 設定已儲存！',text:'所有後台設定已更新',timer:2000,showConfirmButton:false,icon:'success'});
+      // ☁️ 自動同步到 GitHub
+      if (CLOUD.token && CLOUD.owner && CLOUD.repo) cloudPush(true);
     }
   });
 };

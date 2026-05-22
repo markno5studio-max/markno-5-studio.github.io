@@ -14,7 +14,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026052203">
+<link rel="stylesheet" href="style.css?v=2026052301">
 </head>
 <body>
 <div id="intro-overlay">
@@ -227,14 +227,14 @@
     <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
     <button class="admin-btn" id="backend-settings-btn" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
-    <button class="admin-btn" data-role="super_admin" onclick="generatePublishFile()">📤 發布</button>
+    <button class="admin-btn" data-role="super_admin" onclick="cloudPush(false)" title="立即同步最新內容到 GitHub，所有裝置重新整理即可看到">☁️ 同步</button>
 
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
     <button class="admin-btn logout" data-role="editor" onclick="adminLogout()">登出</button>
   </div>
 </div>
 
-<script src="content.js?v=2026052203"></script>
-<script src="app.js?v=2026052203"></script>
+<script src="content.js?v=2026052301"></script>
+<script src="app.js?v=2026052301"></script>
 </body>
 </html>
