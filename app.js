@@ -3758,4 +3758,3 @@ window.copyLink = function() {
 ============================================================ */
 window.openMobileNav = function() { document.getElementById('mobile-nav').classList.add('open'); };
 window.closeMobileNav = function() { document.getElementById('mobile-nav').classList.remove('open'); };
-</script>
