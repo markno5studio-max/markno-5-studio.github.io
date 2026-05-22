@@ -8,7 +8,7 @@ const SITE_VERSION = '2026.05.22.02';
    STORAGE KEY
 ============================================================ */
 
-var KEY = `MK5_${SITE_VERSION}`;
+var KEY = 'MK5_DATA'; // 固定 key，不隨版本改變，避免資料遺失
 
 /* ============================================================
    FORCE CLEAR OLD CACHE
@@ -21,41 +21,31 @@ var KEY = `MK5_${SITE_VERSION}`;
 
   if (savedVersion !== SITE_VERSION) {
 
-    console.log('偵測到新版本，清除快取中...');
+    console.log('偵測到新版本 ' + SITE_VERSION + '，更新瀏覽器快取...');
 
-    // 清除 localStorage
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('MK5_')) {
-        localStorage.removeItem(key);
-      }
-    });
+    // ✅ 只清除瀏覽器快取（Cache Storage、Service Worker）
+    // ✅ 不清除 localStorage 資料（MK5_DATA），避免用戶設定遺失
 
     // 清除 Cache Storage
     if ('caches' in window) {
       const names = await caches.keys();
-
-      await Promise.all(
-        names.map(name => caches.delete(name))
-      );
+      await Promise.all(names.map(name => caches.delete(name)));
     }
 
     // 清除 Service Worker
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
-
       for (const reg of regs) {
         await reg.unregister();
       }
     }
 
-    // 儲存新版本
+    // 儲存新版本號
     localStorage.setItem(CACHE_KEY, SITE_VERSION);
 
-    // 強制跳轉刷新（Safari 比 reload 更有效）
+    // 強制重新載入（清除 HTTP 快取）
     const url = new URL(window.location.href);
-
-    url.searchParams.set('v', SITE_VERSION);
-
+    url.searchParams.set('_mk5v', SITE_VERSION);
     window.location.replace(url.toString());
 
   }
@@ -208,6 +198,9 @@ var DEF = {
 /* ============================================================
    STATE
 ============================================================ */
+// 已發布內容的時間戳記（來自 content.js）
+var PUBLISHED_AT = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._publishedAt) ? window.MK5_PUBLISHED._publishedAt : '';
+
 var D = null, CU = null, CF = 'All', SQ = '', carIdx = 0, carTimer = null, PF_PAGE = 0;
 var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
@@ -485,7 +478,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadData() {
   try {
-    var s = localStorage.getItem(KEY);
+    var s = localStorage.getItem(KEY); // KEY = 'MK5_DATA'（固定）
+
+    // ── 舊版本資料遷移：若 MK5_DATA 不存在，從 MK5_20xx.xx.xx 格式遷移 ──
+    if (!s) {
+      var oldKeys = Object.keys(localStorage).filter(function(k) {
+        return /^MK5_20\d{2}/.test(k);
+      });
+      if (oldKeys.length > 0) {
+        oldKeys.sort();
+        s = localStorage.getItem(oldKeys[oldKeys.length - 1]);
+        if (s) {
+          console.log('✅ 已從舊版本遷移資料：' + oldKeys[oldKeys.length - 1]);
+          localStorage.setItem(KEY, s);
+          oldKeys.forEach(function(k) { localStorage.removeItem(k); });
+        }
+      }
+    }
+
     if (s) {
       var p = JSON.parse(s);
       D = Object.assign({}, DEF, p);
@@ -498,8 +508,29 @@ function loadData() {
       if (!D.formChecklist || !D.formChecklist.length) D.formChecklist = DEF.formChecklist.slice();
       if (!D.users || !D.users.length) D.users = JSON.parse(JSON.stringify(DEF.users));
       if (!D.editLog) D.editLog = [];
+
+      // ── 檢查是否有比 localStorage 更新的發布內容（content.js）──
+      var savedPublishedAt = D._publishedAt || '';
+      if (PUBLISHED_AT && PUBLISHED_AT > savedPublishedAt) {
+        mergePublishedContent();
+      }
+
     } else {
-      D = JSON.parse(JSON.stringify(DEF));
+      // 沒有 localStorage 資料 → 使用 content.js 發布內容，或 DEF 預設值
+      if (window.MK5_PUBLISHED && typeof window.MK5_PUBLISHED === 'object') {
+        D = Object.assign({}, DEF, window.MK5_PUBLISHED);
+        D.social = Object.assign({}, DEF.social, window.MK5_PUBLISHED.social || {});
+        D.analytics = Object.assign({}, DEF.analytics);
+        D.theme = Object.assign({}, DEF.theme, window.MK5_PUBLISHED.theme || {});
+        if (!D.logoData || D.logoData.length < 50) D.logoData = DEF.logoData;
+        if (!D.carouselImages || !D.carouselImages.length) D.carouselImages = DEF.carouselImages.slice();
+        if (!D.users || !D.users.length) D.users = JSON.parse(JSON.stringify(DEF.users));
+        if (!D.editLog) D.editLog = [];
+        D._publishedAt = PUBLISHED_AT;
+        console.log('✅ 已載入已發布內容（content.js）');
+      } else {
+        D = JSON.parse(JSON.stringify(DEF));
+      }
       persist();
     }
   } catch(e) {
@@ -512,6 +543,101 @@ function loadData() {
     startAutoLogout(); startAutoSave();
   }
 }
+
+/* ============================================================
+   MERGE PUBLISHED CONTENT（同步 content.js 發布的資料）
+============================================================ */
+function mergePublishedContent() {
+  if (!window.MK5_PUBLISHED || typeof window.MK5_PUBLISHED !== 'object') return;
+  var pub = window.MK5_PUBLISHED;
+
+  // 只更新內容欄位，不覆蓋用戶帳號、來信、分析資料
+  var contentFields = [
+    'logoData','logoType','brandName','introTagline','introTaglineSize',
+    'marqueeItems','marqueeColor','marqueeSpeed','marqueeShow',
+    'heroSubtitle','heroEnTitle','heroZhTitle','heroDesc',
+    'label01','label02','label03','label04','label05',
+    'aboutHeading','aboutDesc','aboutTitle','readyDesc','readyTitle',
+    'card1Desc','missionTitle','card1Title','card1SubDesc','card2Title','card2Desc',
+    'servicesHeading','servicesSub','processHeading','processSub',
+    'svc1Title','svc1Desc','svc2Title','svc2Desc','svc3Title','svc3Desc',
+    'svc4Title','svc4Desc','svc5Title','svc5Desc','svc6Title','svc6Desc','svc7Title','svc7Desc',
+    'procTitle1','procTitle2','procTitle3','procTitle4','procTitle5','procTitle6','procTitle7','procTitle8',
+    'procDesc1','procDesc2','procDesc3','procDesc4','procDesc5','procDesc6','procDesc7','procDesc8',
+    'portfolioHeading','contactTitle','contactDesc','contactEmail','formNote',
+    'footerTagline','readyText','footerCompany','footerCopyTpl',
+    'portfolio','pfCategories','serviceDescriptions','formChecklist','carouselImages',
+    'gmailUrl','mailToAddress'
+  ];
+
+  contentFields.forEach(function(field) {
+    if (pub[field] !== undefined) D[field] = pub[field];
+  });
+
+  if (pub.social) D.social = Object.assign({}, D.social, pub.social);
+  if (pub.theme)  D.theme  = Object.assign({}, D.theme,  pub.theme);
+  if (pub.backendSettings) D.backendSettings = Object.assign({}, D.backendSettings, pub.backendSettings);
+
+  D._publishedAt = PUBLISHED_AT;
+  persist();
+  console.log('✅ 已套用最新發布內容（' + PUBLISHED_AT + '）');
+}
+
+/* ============================================================
+   GENERATE PUBLISH FILE（生成 content.js，讓手機也能看到最新內容）
+============================================================ */
+window.generatePublishFile = function() {
+  if (!CU || CU.role !== 'super_admin') {
+    Swal.fire({ title: '無權限', text: '只有超級執行長才能發布網站內容', icon: 'error' });
+    return;
+  }
+
+  // 建立發布資料（排除敏感資料）
+  var published = JSON.parse(JSON.stringify(D));
+  delete published.users;
+  delete published.inbox;
+  delete published.analytics;
+  delete published.editLog;
+  published._publishedAt = new Date().toISOString();
+
+  var json = JSON.stringify(published, null, 2);
+  var date = new Date().toLocaleString('zh-TW');
+
+  var jsContent =
+    '/* ================================================================\n' +
+    '   馬克伍號影像工作室 - 發布內容 (content.js)\n' +
+    '   發布時間：' + date + '\n' +
+    '   ⚠ 此檔案由後台「📤 發布到網站」自動生成，請勿手動修改\n' +
+    '   ✅ 將此檔案部署到 GitHub 後，所有裝置（含手機）將自動看到最新內容\n' +
+    '================================================================ */\n\n' +
+    'window.MK5_PUBLISHED = ' + json + ';\n';
+
+  var blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'content.js';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+
+  Swal.fire({
+    title: '📤 content.js 已生成',
+    html: '<div style="text-align:left;line-height:1.9;font-size:.9rem">' +
+          '下載完成！請依以下步驟讓手機看到最新內容：<br><br>' +
+          '<ol style="padding-left:20px;margin:0">' +
+          '<li>將 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">content.js</code> 放到網站根目錄（與 index.html 同層）</li>' +
+          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git add content.js</code></li>' +
+          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git commit -m "📤 發布最新內容"</code></li>' +
+          '<li>執行 <code style="background:var(--bg3);padding:2px 6px;border-radius:3px;color:var(--gold)">git push</code></li>' +
+          '<li>等待約 1~3 分鐘，所有裝置將自動看到最新內容 ✅</li>' +
+          '</ol></div>',
+    icon: 'success',
+    confirmButtonText: '✅ 了解',
+    width: 560
+  });
+};
 
 function persist() {
   try {
@@ -2327,8 +2453,8 @@ function clearAutoLogout() {
 
 function resetAutoLogout() {
   if (CU) {
-    startAutoLogout(); startAutoSave(); // 重新開始計時
-    startAutoSave(); // 同時重置自動儲存
+    startAutoLogout();
+    startAutoSave();
   }
 }
 

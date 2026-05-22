@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>馬克伍號影像工作室 | MARK NO.5 VIDEO STUDIO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@200;300;400;500;700;900&family=Bebas+Neue&family=Iansui&family=Google+Sans+Flex&display=swap" rel="stylesheet">
@@ -224,12 +227,14 @@
     <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
     <button class="admin-btn" id="backend-settings-btn" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
+    <button class="admin-btn" data-role="super_admin" onclick="generatePublishFile()">📤 發布</button>
 
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
     <button class="admin-btn logout" data-role="editor" onclick="adminLogout()">登出</button>
   </div>
 </div>
 
+<script src="content.js?v=2026052202"></script>
 <script src="app.js?v=2026052202"></script>
 </body>
 </html>
