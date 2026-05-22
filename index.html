@@ -650,9 +650,48 @@ footer{background:var(--bg2);border-top:1px solid var(--border);padding:60px 6% 
 
 <script>
 /* ============================================================
-   CONSTANTS
+   SITE VERSION
 ============================================================ */
-var KEY = 'MK5_v9_2025';
+
+const SITE_VERSION = '2026.05.22.01';
+
+/* ============================================================
+   STORAGE KEY
+============================================================ */
+
+var KEY = `MK5_${SITE_VERSION}`;
+
+/* ============================================================
+   FORCE CLEAR OLD CACHE
+============================================================ */
+
+(function(){
+
+  const savedVersion = localStorage.getItem('MK5_SITE_VERSION');
+
+  if(savedVersion !== SITE_VERSION){
+
+    Object.keys(localStorage).forEach(key=>{
+
+      if(key.startsWith('MK5_')){
+        localStorage.removeItem(key);
+      }
+
+    });
+
+    localStorage.setItem('MK5_SITE_VERSION', SITE_VERSION);
+
+    if(!sessionStorage.getItem('MK5_ALREADY_REFRESHED')){
+
+      sessionStorage.setItem('MK5_ALREADY_REFRESHED','1');
+
+      location.reload();
+
+    }
+
+  }
+
+})();
 
 var EDITOR_KEYS = {
   'aboutDesc':1,'readyDesc':1,'card1Desc':1,'card2Desc':1,'readyTitle':1,
