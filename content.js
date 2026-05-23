@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 上午12:57:03
+   Published: 2026/5/24 上午12:58:16
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -218,7 +218,19 @@ window.MK5_PUBLISHED = {
     },
     {
       "url": "https://youtu.be/emWyV7MqWOY",
-      "title": "用路順暢篇-國語字幕版",
+      "title": "用路順暢篇-國語版",
+      "cat": "動畫製作",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/6Tc3I8RXJ4M",
+      "title": "行人安全篇-國語版",
+      "cat": "動畫製作",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/b9UCRZ5e7kE",
+      "title": "通行無阻篇-國語版",
       "cat": "動畫製作",
       "description": ""
     }
@@ -269,7 +281,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T16:57:03.011Z",
+  "_publishedAt": "2026-05-23T16:58:16.498Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
