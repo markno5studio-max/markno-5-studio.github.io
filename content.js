@@ -1,8 +1,7 @@
 /* ================================================================
-   馬克伍號影像工作室 - 發布內容 (content.js)
-   發布時間：2026/5/23 上午12:08:28
-   ⚠ 此檔案由後台「📤 發布到網站」自動生成，請勿手動修改
-   ✅ 將此檔案部署到 GitHub 後，所有裝置（含手機）將自動看到最新內容
+   MK5 - Published Content (content.js)
+   Published: 2026/5/24 上午2:01:11
+   Auto-generated. Do not edit manually.
 ================================================================ */
 
 window.MK5_PUBLISHED = {
@@ -29,7 +28,7 @@ window.MK5_PUBLISHED = {
   "label04": "04 · SELECTED WORKS",
   "label05": "05 · GET IN TOUCH",
   "aboutHeading": "關於馬克伍號",
-  "aboutDesc": "馬克伍號影像工作室，由 馬克斯（Marcus） 創立。 19 年影像製作經驗，從電視產業後期出發， 穿越節目製作、商業廣告與視覺設計領域。這不是單一技術的累積， 而是一種對影像語言的長時間觀察與理解。我們理解畫面如何說話， 也理解觀眾如何感受。",
+  "aboutDesc": "馬克伍號影像工作室，由 馬克斯 創立。 19 年影像製作經驗，從電視產業後期出發， 穿越節目製作、商業廣告與視覺設計領域。這不是單一技術的累積， 而是一種對影像語言的長時間觀察與理解。我們理解畫面如何說話， 也理解觀眾如何感受。",
   "aboutTitle": "打造卓越視覺的<span style=\"color:var(--gold)\">專業影像夥伴</span>",
   "readyDesc": "我們的起點，來自於早期參與知名電視節目後期製作，在高強度製作環境中，磨練出對節奏、敘事與細節的極致要求。隨著經驗累積，逐步拓展至：<ul><li>節目製作與內容企劃</li><li>商業廣告與品牌形象影片</li><li>動畫設計與視覺特效（VFX / Motion Graphics）</li><li>數位內容與新媒體影像整合</li></ul><p style=\"margin-top:10px;font-size:.88rem;color:var(--t3)\">這些歷程，不只是技術的累積，更是對影像語言與市場溝通方式的深度理解。</p>",
   "readyTitle": "\"Ready.\" 準備好，創造價值",
@@ -103,9 +102,10 @@ window.MK5_PUBLISHED = {
     "企業形象廣告",
     "募資影片",
     "活動紀錄",
-    "短影音",
     "音樂錄影帶",
-    "動畫製作"
+    "動畫製作",
+    "公家機關",
+    "短影音"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -179,6 +179,78 @@ window.MK5_PUBLISHED = {
       "title": "宏匯廣場活動短片-粉領篇",
       "cat": "短影音",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/lob_qhrZfNA",
+      "title": "新北市觀光",
+      "cat": "公家機關",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/CD1BMF-tdbg",
+      "title": "JOLLY & PHILIP婚宴",
+      "cat": "活動紀錄",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/wubbsrYNx18",
+      "title": "QDM表揚會",
+      "cat": "活動紀錄",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/4ItRvqUCGY8",
+      "title": "A2 Ultra social media video",
+      "cat": "品牌形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/JmUXNUueCL4",
+      "title": "《吞食天地：３放置版 》 主題曲MV 15S",
+      "cat": "品牌形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/ccbhQtKx6eA",
+      "title": "《吞食天地3：放置版》主題曲完整版",
+      "cat": "品牌形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/emWyV7MqWOY",
+      "title": "用路順暢篇-國語版",
+      "cat": "動畫製作",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/6Tc3I8RXJ4M",
+      "title": "行人安全篇-國語版",
+      "cat": "動畫製作",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/b9UCRZ5e7kE",
+      "title": "通行無阻篇-國語版",
+      "cat": "動畫製作",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/d63EfTHzQo4",
+      "title": "【中醫診所】皮膚炎篇",
+      "cat": "企業形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/aLLL0vAruEM",
+      "title": "【中醫診所】不孕症篇",
+      "cat": "企業形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/xBze_AtYH-g",
+      "title": "【中醫診所】胃食道逆流篇",
+      "cat": "企業形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -218,7 +290,7 @@ window.MK5_PUBLISHED = {
     "dragArrowHoverOpacity": 0.9,
     "dragArrowCooldown": 300,
     "dragArrowActiveGlow": 20,
-    "dragArrowIcon": "chevron",
+    "dragArrowIcon": "double",
     "pfGlowColor": "#C9963A",
     "pfGlowSize": 28,
     "pfGlowRange": 56,
@@ -227,5 +299,8 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-22T16:08:28.087Z"
+  "_publishedAt": "2026-05-23T18:01:11.861Z",
+  "_cloudOwner": "markno5studio-max",
+  "_cloudRepo": "markno-5-studio.github.io",
+  "_cloudBranch": "main"
 };
