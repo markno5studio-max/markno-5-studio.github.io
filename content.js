@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/23 下午6:53:34
+   Published: 2026/5/24 上午12:55:43
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -203,6 +203,12 @@ window.MK5_PUBLISHED = {
       "title": "A2 Ultra social media video",
       "cat": "品牌形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/JmUXNUueCL4",
+      "title": "《吞食天地：３放置版 》 主題曲MV 15S",
+      "cat": "品牌形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -251,7 +257,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T10:53:34.686Z",
+  "_publishedAt": "2026-05-23T16:55:43.166Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
