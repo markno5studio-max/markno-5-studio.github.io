@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/23 下午6:19:21
+   Published: 2026/5/23 下午6:21:05
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -191,6 +191,12 @@ window.MK5_PUBLISHED = {
       "title": "JOLLY & PHILIP婚宴",
       "cat": "活動紀錄",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/wubbsrYNx18",
+      "title": "QDM表揚會",
+      "cat": "活動紀錄",
+      "description": ""
     }
   ],
   "theme": {
@@ -239,7 +245,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T10:19:21.468Z",
+  "_publishedAt": "2026-05-23T10:21:05.484Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
