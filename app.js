@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.07';
+const SITE_VERSION = '2026.05.23.08';
 
 /* ============================================================
    STORAGE KEY
@@ -3858,16 +3858,40 @@ window.showUsers = function() {
     return html;
   }
 
-  var logRows = '';
+  var _isAdmin = CU && CU.role === 'super_admin';
+  var _myName  = CU && CU.username;
+
+  // 超級執行長：看所有人紀錄 | 其他人：只看自己的紀錄
   var logs = D.editLog || [];
-  for (var i = 0; i < Math.min(logs.length, 15); i++) {
-    var l = logs[i];
-    logRows += '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:.72rem;color:var(--t3);display:flex;justify-content:space-between;align-items:center">' +
-      '<div><span style="color:var(--gold)">' + l.user + '</span> · ' + l.date + '<br><span>' + (l.keys||[]).slice(0,4).join(', ') + ((l.keys||[]).length>4?'…':'') + '</span></div>' +
-      (l.snapshot ? '<button onclick="restoreSnap(' + i + ')" style="background:transparent;border:1px solid var(--border-g);color:var(--t2);padding:2px 8px;cursor:pointer;font-size:.7rem;flex-shrink:0">還原</button>' : '') +
+  var visibleLogs = [];
+  for (var _li = 0; _li < logs.length; _li++) {
+    if (_isAdmin || logs[_li].username === _myName) {
+      visibleLogs.push({ log: logs[_li], idx: _li });
+    }
+  }
+
+  var logRows = '';
+  var logSectionTitle = _isAdmin ? '全員編輯紀錄' : '我的編輯紀錄';
+  for (var i = 0; i < Math.min(visibleLogs.length, 15); i++) {
+    var _entry = visibleLogs[i];
+    var l = _entry.log;
+    var _origIdx = _entry.idx;
+    logRows +=
+      '<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:.72rem;color:var(--t3);display:flex;justify-content:space-between;align-items:center">' +
+        '<div>' +
+          // 超級執行長看到名字，其他人只看時間（都是自己的）
+          (_isAdmin ? '<span style="color:var(--gold)">' + l.user + '</span> · ' : '') +
+          l.date +
+          '<br><span>' + (l.keys||[]).slice(0, 4).join(', ') + ((l.keys||[]).length > 4 ? '…' : '') + '</span>' +
+        '</div>' +
+        // 還原按鈕：僅超級執行長可見
+        (_isAdmin && l.snapshot ? '<button onclick="restoreSnap(' + _origIdx + ')" style="background:transparent;border:1px solid var(--border-g);color:var(--t2);padding:2px 8px;cursor:pointer;font-size:.7rem;flex-shrink:0">還原</button>' : '') +
       '</div>';
   }
-  if (!logRows) logRows = '<div style="color:var(--t3);font-size:.78rem;padding:8px 0">尚無紀錄</div>';
+  if (!logRows) {
+    logRows = '<div style="color:var(--t3);font-size:.78rem;padding:8px 0">' +
+      (_isAdmin ? '尚無任何編輯紀錄' : '您尚無任何編輯紀錄') + '</div>';
+  }
 
   window.delUserAt = function(i) { D.users.splice(i, 1); persist(); document.getElementById('ulistw').innerHTML = uLH(); };
   window.restoreSnap = function(li) {
@@ -4037,7 +4061,7 @@ window.showUsers = function() {
     title: '👥 帳號管理', width: 560,
     html: '<div id="ulistw" style="text-align:left;max-height:220px;overflow-y:auto">' + uLH() + '</div>' +
           '<button onclick="addUserDlg()" style="margin-top:12px;background:var(--gold);border:none;color:var(--bg);padding:8px 18px;cursor:pointer;font-size:.82rem;font-weight:700">＋ 新增帳號</button>' +
-          '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.75rem;letter-spacing:.1em">編輯紀錄</strong>' +
+          '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.75rem;letter-spacing:.1em">' + logSectionTitle + '</strong>' +
           '<div style="max-height:160px;overflow-y:auto;margin-top:6px">' + logRows + '</div></div>',
     confirmButtonText: '關閉', showCancelButton: false,
     didOpen: function() {
