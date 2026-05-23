@@ -648,10 +648,16 @@ function buildPublishData() {
 async function cloudPush(silent) {
   if (!CLOUD.token || !CLOUD.owner || !CLOUD.repo) {
     if (!silent) {
+      // 直接開啟後台設定並捲動到雲端同步區塊
       Swal.fire({
         title: '☁️ 尚未設定雲端同步',
-        html: '請到「⚙️ 後台設定」→ 最下方「☁️ 雲端同步設定」，<br>填入 GitHub 資訊後即可自動同步。',
-        icon: 'info'
+        html: '只需設定一次 GitHub Token，之後每次儲存都會自動同步。<br><br>' +
+              '<button onclick="Swal.close();setTimeout(function(){openBackendSettings(true);},100)" ' +
+              'style="padding:8px 20px;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem">⚙️ 前往設定</button>',
+        icon: 'info',
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: '稍後再說'
       });
     }
     return false;
@@ -2737,7 +2743,7 @@ window.adminLogout = function() {
 /* ============================================================
    BACKEND SETTINGS (super_admin only)
 ============================================================ */
-window.openBackendSettings = function() {
+window.openBackendSettings = function(scrollToCloud) {
   if (!CU) {
     Swal.fire({title:'無權限',text:'請先登入',icon:'error'});
     return;
@@ -3101,6 +3107,8 @@ window.openBackendSettings = function() {
     confirmButtonText: '💾 儲存所有設定',
     showCancelButton: true,
     cancelButtonText: '取消',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
     customClass: {
       container: 'backend-settings-modal'
     },
@@ -3108,11 +3116,28 @@ window.openBackendSettings = function() {
       var modal = document.querySelector('.swal2-popup');
       if (modal) {
         modal.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
+          // 只有在非 textarea/input 時才用 Enter 確認，避免打字時誤觸儲存
+          if (e.key === 'Enter' && !e.shiftKey &&
+              e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
             e.preventDefault();
             Swal.clickConfirm();
           }
         });
+      }
+      // 若從「☁️ 同步」按鈕進入，自動捲動到雲端同步設定區塊
+      if (scrollToCloud) {
+        var container = document.querySelector('.swal2-html-container');
+        var cloudH3 = container && Array.from(container.querySelectorAll('h3'))
+          .find(function(el) { return el.textContent.includes('雲端同步'); });
+        if (cloudH3) {
+          setTimeout(function() {
+            cloudH3.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // 金色閃爍提示
+            cloudH3.style.transition = 'background .3s';
+            cloudH3.style.background = 'rgba(201,150,58,0.2)';
+            setTimeout(function() { cloudH3.style.background = ''; }, 1500);
+          }, 200);
+        }
       }
     },
     preConfirm: function() {
