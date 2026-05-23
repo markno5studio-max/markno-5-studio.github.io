@@ -1,8 +1,7 @@
 /* ================================================================
-   馬克伍號影像工作室 - 發布內容 (content.js)
-   發布時間：2026/5/23 上午12:08:28
-   ⚠ 此檔案由後台「📤 發布到網站」自動生成，請勿手動修改
-   ✅ 將此檔案部署到 GitHub 後，所有裝置（含手機）將自動看到最新內容
+   MK5 - Published Content (content.js)
+   Published: 2026/5/23 下午5:35:55
+   Auto-generated. Do not edit manually.
 ================================================================ */
 
 window.MK5_PUBLISHED = {
@@ -105,7 +104,8 @@ window.MK5_PUBLISHED = {
     "活動紀錄",
     "短影音",
     "音樂錄影帶",
-    "動畫製作"
+    "動畫製作",
+    "公家機關"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -179,6 +179,12 @@ window.MK5_PUBLISHED = {
       "title": "宏匯廣場活動短片-粉領篇",
       "cat": "短影音",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/lob_qhrZfNA",
+      "title": "新北市觀光",
+      "cat": "公家機關",
+      "description": ""
     }
   ],
   "theme": {
@@ -218,7 +224,7 @@ window.MK5_PUBLISHED = {
     "dragArrowHoverOpacity": 0.9,
     "dragArrowCooldown": 300,
     "dragArrowActiveGlow": 20,
-    "dragArrowIcon": "chevron",
+    "dragArrowIcon": "double",
     "pfGlowColor": "#C9963A",
     "pfGlowSize": 28,
     "pfGlowRange": 56,
@@ -227,5 +233,8 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-22T16:08:28.087Z"
+  "_publishedAt": "2026-05-23T09:35:55.482Z",
+  "_cloudOwner": "markno5studio-max",
+  "_cloudRepo": "markno-5-studio.github.io",
+  "_cloudBranch": "main"
 };
