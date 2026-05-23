@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.05';
+const SITE_VERSION = '2026.05.23.06';
 
 /* ============================================================
    STORAGE KEY
@@ -217,7 +217,7 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowIcon','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowIcon','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText','cloudSync'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
@@ -229,7 +229,8 @@ var EDITABLE_NAMES = {
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
   dragArrowColor:'拖曳箭頭顏色',dragArrowIcon:'拖曳箭頭樣式',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
   pfGlowColor:'拖曳發光顏色',pfGlowSize:'拖曳發光大小',pfGlowRange:'拖曳發光範圍',pfGlowBrightness:'拖曳發光明亮',pfGlowSoftness:'拖曳發光柔化',
-  autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
+  autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字',
+  cloudSync:'☁️ 雲端同步設定（49–52）'
 };
 
 /* ============================================================
@@ -3171,8 +3172,8 @@ window.openBackendSettings = function(scrollToCloud) {
         }
       }
 
-      // ─── 15. 雲端同步設定（super_admin 專用） ───
-      if (isSuperAdmin) {
+      // ─── 15. 雲端同步設定（super_admin 或擁有 cloudSync 權限者可見） ───
+      if (isSuperAdmin || canEdit('cloudSync')) {
         // 重新從 localStorage 取得最新 CLOUD 設定（確保顯示已儲存的值）
         try {
           var savedCloud = localStorage.getItem('MK5_CLOUD');
@@ -3182,8 +3183,6 @@ window.openBackendSettings = function(scrollToCloud) {
         var cloudStatus = cloudOk
           ? '<span style="color:#4ade80">✅ 已設定（' + CLOUD.owner + '/' + CLOUD.repo + '）</span>'
           : '<span style="color:var(--t3)">⚪ 尚未設定</span>';
-        // 即時儲存 helper（inline oninput）
-        var saveCloudFn = "try{var o=document.getElementById('bs-cloud-owner'),r=document.getElementById('bs-cloud-repo'),b=document.getElementById('bs-cloud-branch'),t=document.getElementById('bs-cloud-token');if(o)CLOUD.owner=o.value.trim();if(r)CLOUD.repo=r.value.trim();if(b)CLOUD.branch=b.value.trim()||'main';if(t)CLOUD.token=t.value.trim();localStorage.setItem('MK5_CLOUD',JSON.stringify(CLOUD));}catch(e){}";
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ ☁️ 雲端同步設定</h3>';
         h += '<p style="font-size:.82rem;color:var(--t2);margin-bottom:14px;line-height:1.8">';
         h += '設定後，每次點擊「💾 儲存」將自動把最新內容同步到 GitHub。<br>';
@@ -3191,12 +3190,12 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '目前狀態：' + cloudStatus + '</p>';
         // ⚠️ 注意：SweetAlert2 用 DOMPurify 消毒 HTML，會移除所有 oninput/onclick 屬性
         //    所以這裡不放 oninput，改在 didOpen 用 addEventListener 掛載
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">49. GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">50. 儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">51. 分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" autocomplete="off"></label>';
         // Token 欄位：用 text 顯示（避免瀏覽器密碼管理器覆蓋 value）
         var tokenDisplay = CLOUD.token ? CLOUD.token : '';
-        h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">GitHub Token（Personal Access Token）：</label>';
+        h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">52. GitHub Token（Personal Access Token）：</label>';
         h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
         h += '<input id="bs-cloud-token" class="swal2-input" style="margin:0;flex:1" type="text" value="' + tokenDisplay + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">';
         h += '</div>';
