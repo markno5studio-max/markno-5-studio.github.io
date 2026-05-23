@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.02';
+const SITE_VERSION = '2026.05.23.03';
 
 /* ============================================================
    STORAGE KEY
@@ -665,9 +665,12 @@ async function cloudPush(silent) {
 
   var branch  = CLOUD.branch || 'main';
   var apiUrl  = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
+  // ✅ Fine-grained PAT（github_pat_...）必須使用 Bearer，classic PAT（ghp_...）兩者均可
+  var authHeader = 'Bearer ' + CLOUD.token;
   var headers = {
-    'Authorization': 'token ' + CLOUD.token,
-    'Accept': 'application/vnd.github.v3+json',
+    'Authorization': authHeader,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
     'Content-Type': 'application/json'
   };
 
@@ -681,7 +684,14 @@ async function cloudPush(silent) {
     if (shaRes.ok) {
       var shaData = await shaRes.json();
       sha = shaData.sha;
-    } else if (shaRes.status !== 404) {
+      console.log('☁️ 已取得 SHA：' + sha);
+    } else if (shaRes.status === 404) {
+      console.log('☁️ content.js 尚不存在，將建立新檔案');
+    } else if (shaRes.status === 401) {
+      throw new Error('EAUTH:Token 驗證失敗（401）');
+    } else if (shaRes.status === 403) {
+      throw new Error('EPERM:Token 權限不足（403）');
+    } else {
       throw new Error('無法取得檔案資訊（HTTP ' + shaRes.status + '）');
     }
 
@@ -690,10 +700,9 @@ async function cloudPush(silent) {
     var date     = new Date().toLocaleString('zh-TW');
     var jsContent =
       '/* ================================================================\n' +
-      '   馬克伍號影像工作室 - 發布內容 (content.js)\n' +
-      '   發布時間：' + date + '\n' +
-      '   ⚠ 此檔案由後台「💾 儲存」時自動同步，請勿手動修改\n' +
-      '   ✅ 所有裝置重新整理後即可看到最新內容\n' +
+      '   MK5 - Published Content (content.js)\n' +
+      '   Published: ' + date + '\n' +
+      '   Auto-generated. Do not edit manually.\n' +
       '================================================================ */\n\n' +
       'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
 
@@ -701,25 +710,37 @@ async function cloudPush(silent) {
     var encoded = btoa(unescape(encodeURIComponent(jsContent)));
 
     // 4. 上傳到 GitHub
-    var body = { message: '☁️ 自動同步內容 ' + date, content: encoded, branch: branch };
+    var body = {
+      message: 'chore: auto-sync content ' + new Date().toISOString(),
+      content: encoded,
+      branch: branch
+    };
     if (sha) body.sha = sha;
 
+    console.log('☁️ 上傳到：', apiUrl, '| branch:', branch, '| sha:', sha || '(新建)');
     var res = await fetch(apiUrl, { method: 'PUT', headers: headers, body: JSON.stringify(body) });
 
     if (!res.ok) {
       var errData = {};
-      try { errData = await res.json(); } catch(e) {}
-      throw new Error(errData.message || 'HTTP ' + res.status);
+      try { errData = await res.json(); } catch(ee) {}
+      console.error('☁️ PUT 失敗：', res.status, errData);
+
+      if (res.status === 401)       throw new Error('EAUTH:Token 驗證失敗，請確認 Token 是否正確或已過期。');
+      if (res.status === 403)       throw new Error('EPERM:Token 無寫入權限，請確認已勾選「Contents: Read and Write」。');
+      if (res.status === 404)       throw new Error('ENOREPO:找不到儲存庫或 Token 未授權此 Repo。\n請確認：①用戶名稱、儲存庫名稱是否正確 ②建立 Token 時是否有選取此儲存庫 ③是否勾選「Contents: Read and Write」');
+      if (res.status === 409)       throw new Error('衝突（409），請稍後再試。');
+      if (res.status === 422)       throw new Error('內容格式錯誤（422）：' + (errData.message || ''));
+      throw new Error((errData.message || '未知錯誤') + '（HTTP ' + res.status + '）');
     }
 
     // 5. 更新本地時間戳
     D._publishedAt = pub._publishedAt;
-    // 同時更新 window.MK5_PUBLISHED 供 cloudPull 比對
     window.MK5_PUBLISHED = pub;
     PUBLISHED_AT = pub._publishedAt;
     persist();
 
-    showSyncStatus('☁️ 已同步', 'success');
+    showSyncStatus('☁️ 已同步 ✓', 'success');
+    console.log('☁️ 同步成功！時間：', pub._publishedAt);
     if (!silent) {
       Swal.fire({
         title: '☁️ 同步成功！',
@@ -730,13 +751,37 @@ async function cloudPush(silent) {
     return true;
 
   } catch(e) {
-    console.error('cloudPush 失敗：', e);
+    console.error('☁️ cloudPush 失敗：', e.message);
     showSyncStatus('⚠️ 同步失敗', 'error');
+
     if (!silent) {
+      // 解析錯誤代碼給出友善說明
+      var errMsg = e.message || '未知錯誤';
+      var errHint = '';
+      if (errMsg.startsWith('EAUTH:')) {
+        errMsg  = errMsg.slice(6);
+        errHint = '請至後台設定，重新輸入正確的 GitHub Token。';
+      } else if (errMsg.startsWith('EPERM:')) {
+        errMsg  = errMsg.slice(6);
+        errHint = '請重新建立 Token，在「Repository permissions」中將「Contents」設為「Read and Write」。';
+      } else if (errMsg.startsWith('ENOREPO:')) {
+        errMsg  = errMsg.slice(8);
+        errHint = '';
+      } else {
+        errHint = '請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確。';
+      }
       Swal.fire({
         title: '☁️ 同步失敗',
-        html: '<b>' + (e.message || '未知錯誤') + '</b><br><small>請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確</small>',
-        icon: 'error'
+        html: '<div style="text-align:left;line-height:1.8;font-size:.88rem">' +
+              '<b style="color:#f87171">' + errMsg.replace(/\n/g,'<br>') + '</b>' +
+              (errHint ? '<br><br>' + errHint : '') +
+              '</div>',
+        icon: 'error',
+        confirmButtonText: '⚙️ 前往設定',
+        showCancelButton: true,
+        cancelButtonText: '關閉'
+      }).then(function(r) {
+        if (r.isConfirmed) openBackendSettings(true);
       });
     }
     return false;
@@ -773,8 +818,8 @@ async function cloudPull() {
   } catch(e) {}
 
   var apiUrl  = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/content.js?ref=' + branch;
-  var headers = { 'Accept': 'application/vnd.github.v3+json' };
-  if (CLOUD.token) headers['Authorization'] = 'token ' + CLOUD.token;
+  var headers = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  if (CLOUD.token) headers['Authorization'] = 'Bearer ' + CLOUD.token;
 
   try {
     var res = await fetch(apiUrl, { headers: headers });
@@ -883,7 +928,7 @@ window.testCloudConnection = async function() {
   var apiUrl = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
   try {
     var res = await fetch(apiUrl, {
-      headers: { 'Authorization': 'token ' + CLOUD.token, 'Accept': 'application/vnd.github.v3+json' }
+      headers: { 'Authorization': 'Bearer ' + CLOUD.token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
     });
     if (res.ok)           setResult('✅', '連線成功！已找到 content.js，可以正常同步。', true);
     else if (res.status === 404) setResult('✅', '連線成功！儲存庫已連通（首次儲存時會自動建立 content.js）。', true);
