@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.04';
+const SITE_VERSION = '2026.05.23.05';
 
 /* ============================================================
    STORAGE KEY
@@ -3189,14 +3189,16 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '設定後，每次點擊「💾 儲存」將自動把最新內容同步到 GitHub。<br>';
         h += '其他裝置（手機等）重新整理網站即可看到最新資訊，無需手動操作。<br>';
         h += '目前狀態：' + cloudStatus + '</p>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" oninput="' + saveCloudFn + '"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" oninput="' + saveCloudFn + '"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" oninput="' + saveCloudFn + '"></label>';
-        // Token 欄位：用 text 顯示（避免瀏覽器密碼管理器覆蓋 value），搭配 JS 遮罩
+        // ⚠️ 注意：SweetAlert2 用 DOMPurify 消毒 HTML，會移除所有 oninput/onclick 屬性
+        //    所以這裡不放 oninput，改在 didOpen 用 addEventListener 掛載
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" autocomplete="off"></label>';
+        // Token 欄位：用 text 顯示（避免瀏覽器密碼管理器覆蓋 value）
         var tokenDisplay = CLOUD.token ? CLOUD.token : '';
         h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">GitHub Token（Personal Access Token）：</label>';
         h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-        h += '<input id="bs-cloud-token" class="swal2-input" style="margin:0;flex:1" type="text" value="' + tokenDisplay + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" oninput="' + saveCloudFn + '">';
+        h += '<input id="bs-cloud-token" class="swal2-input" style="margin:0;flex:1" type="text" value="' + tokenDisplay + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">';
         h += '</div>';
         h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-bottom:12px;line-height:1.7">';
         h += '如何取得 Token：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>';
@@ -3252,6 +3254,22 @@ window.openBackendSettings = function(scrollToCloud) {
         testBtn.addEventListener('mouseout',  function() { this.style.background = 'var(--bg3)'; });
         testBtn.addEventListener('click', window.testCloudConnection);
       }
+      // ✅ 雲端設定欄位即時儲存：DOMPurify 同樣移除 oninput，改用 addEventListener
+      var saveCloudFields = function() {
+        var o = document.getElementById('bs-cloud-owner');
+        var r = document.getElementById('bs-cloud-repo');
+        var b = document.getElementById('bs-cloud-branch');
+        var t = document.getElementById('bs-cloud-token');
+        if (o) CLOUD.owner  = o.value.trim();
+        if (r) CLOUD.repo   = r.value.trim();
+        if (b) CLOUD.branch = b.value.trim() || 'main';
+        if (t) CLOUD.token  = t.value.trim();
+        try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
+      };
+      ['bs-cloud-owner', 'bs-cloud-repo', 'bs-cloud-branch', 'bs-cloud-token'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', saveCloudFields);
+      });
     },
     preConfirm: function() {
       var v = {};
