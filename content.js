@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 上午1:00:13
+   Published: 2026/5/24 上午1:03:44
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -239,6 +239,12 @@ window.MK5_PUBLISHED = {
       "title": "【中醫診所】皮膚炎篇",
       "cat": "企業形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/aLLL0vAruEM",
+      "title": "【中醫診所】不孕症篇",
+      "cat": "企業形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -250,18 +256,11 @@ window.MK5_PUBLISHED = {
     "t2Color": "#C8C2B6",
     "t3Color": "#9A948C",
     "heroEnFont": "Google Sans Flex",
-    "heroEnSize": "7.5rem",
     "heroZhSize": "2.6rem",
     "scrollColor": "rgba(255,255,255,0.55)",
     "scrollSize": "1rem",
     "scrollFont": "Bebas Neue",
     "labelSize": "0.92rem",
-    "rippleColor": "rgba(201,150,58,0.85)",
-    "rippleOpacity": "0.85",
-    "rippleSize": "86px",
-    "rippleWidth": "3px",
-    "procNumOpacity": "0.18",
-    "procNumHoverOpacity": "1.0",
     "introLogoSize": "300px",
     "datetimeSize": ".78rem",
     "datetimeFont": "Bebas Neue"
@@ -287,7 +286,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T17:00:13.443Z",
+  "_publishedAt": "2026-05-23T17:03:44.770Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
