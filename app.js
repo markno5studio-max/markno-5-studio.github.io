@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.03';
+const SITE_VERSION = '2026.05.23.04';
 
 /* ============================================================
    STORAGE KEY
@@ -906,35 +906,67 @@ window.testCloudConnection = async function() {
   if (tokenEl)  CLOUD.token  = tokenEl.value.trim();
   try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
 
-  function setResult(icon, msg, ok) {
+  // ✅ 用 var 賦值（不用 function 宣告），避免 async 函數內巢狀宣告問題
+  var setResult = function(icon, msg, ok) {
     resultEl.style.display = 'block';
-    resultEl.style.background = ok ? 'rgba(0,160,80,0.15)' : 'rgba(181,32,32,0.15)';
-    resultEl.style.border     = ok ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(248,113,113,0.4)';
-    resultEl.style.color      = ok ? '#4ade80' : '#f87171';
-    resultEl.textContent      = icon + ' ' + msg;
-  }
+    resultEl.style.background = ok === null ? 'rgba(201,150,58,0.12)' :
+                                ok ? 'rgba(0,160,80,0.15)' : 'rgba(181,32,32,0.15)';
+    resultEl.style.border     = ok === null ? '1px solid rgba(201,150,58,0.4)' :
+                                ok ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(248,113,113,0.4)';
+    resultEl.style.color      = ok === null ? '#C9963A' : ok ? '#4ade80' : '#f87171';
+    resultEl.innerHTML        = icon + ' ' + msg;
+  };
 
   if (!CLOUD.owner || !CLOUD.repo || !CLOUD.token) {
     setResult('⚠️', '請先填入所有欄位', false);
     return;
   }
 
-  resultEl.style.display = 'block';
-  resultEl.style.background = 'rgba(201,150,58,0.12)';
-  resultEl.style.border     = '1px solid rgba(201,150,58,0.4)';
-  resultEl.style.color      = '#C9963A';
-  resultEl.textContent      = '🔄 測試中…';
+  setResult('🔄', '測試中…', null);
 
-  var apiUrl = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
+  var authHeaders = {
+    'Authorization': 'Bearer ' + CLOUD.token,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+
   try {
-    var res = await fetch(apiUrl, {
-      headers: { 'Authorization': 'Bearer ' + CLOUD.token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
-    });
-    if (res.ok)           setResult('✅', '連線成功！已找到 content.js，可以正常同步。', true);
-    else if (res.status === 404) setResult('✅', '連線成功！儲存庫已連通（首次儲存時會自動建立 content.js）。', true);
-    else if (res.status === 401) setResult('❌', 'Token 無效，請確認 GitHub Token 正確且未過期。', false);
-    else if (res.status === 403) setResult('❌', '權限不足，Token 缺少 Contents → Read and Write 權限。', false);
-    else                         setResult('❌', '連線失敗（HTTP ' + res.status + '），請確認用戶名稱與儲存庫名稱正確。', false);
+    // 第一步：確認 Token 有效 + 儲存庫存在（可存取）
+    var repoRes = await fetch('https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo, { headers: authHeaders });
+
+    if (repoRes.status === 401) {
+      setResult('❌', 'Token 無效，請確認 GitHub Token 正確且未過期。', false);
+      return;
+    }
+    if (repoRes.status === 403) {
+      setResult('❌', 'Token 權限不足，請確認 Token 已勾選「Contents: Read and Write」。', false);
+      return;
+    }
+    if (repoRes.status === 404) {
+      setResult('❌',
+        '找不到儲存庫「' + CLOUD.owner + '/' + CLOUD.repo + '」<br>' +
+        '請確認以下事項：<br>' +
+        '① 用戶名稱與儲存庫名稱拼寫是否正確<br>' +
+        '② Fine-grained Token 建立時「Repository access」是否已選取此儲存庫<br>' +
+        '③ 需選「Only select repositories」並手動加入此 Repo',
+        false);
+      return;
+    }
+    if (!repoRes.ok) {
+      setResult('❌', '無法連接到儲存庫（HTTP ' + repoRes.status + '）', false);
+      return;
+    }
+
+    // 第二步：確認 content.js 是否存在
+    var fileRes = await fetch('https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js', { headers: authHeaders });
+
+    if (fileRes.ok) {
+      setResult('✅', '連線成功！已找到 content.js，可以正常同步 🎉', true);
+    } else if (fileRes.status === 404) {
+      setResult('✅', '連線成功！儲存庫已連通，首次點擊「💾 儲存」時會自動建立 content.js 🎉', true);
+    } else {
+      setResult('⚠️', '儲存庫連通，但讀取 content.js 時發生問題（HTTP ' + fileRes.status + '）', false);
+    }
   } catch(e) {
     setResult('❌', '網路錯誤：' + (e.message || '無法連接到 GitHub'), false);
   }
@@ -3170,7 +3202,7 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '如何取得 Token：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>';
         h += '需要勾選：Repository → Contents → Read and Write 權限<br>';
         h += '<b style="color:var(--gold)">⚠ Token 僅儲存在此裝置的 localStorage，不會上傳到 GitHub</b></small>';
-        h += '<button type="button" onclick="testCloudConnection()" style="padding:7px 18px;background:var(--bg3);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s" onmouseover="this.style.background=\'rgba(201,150,58,0.15)\'" onmouseout="this.style.background=\'var(--bg3)\'">🔌 測試連線</button>';
+        h += '<button type="button" id="bs-cloud-test-btn" style="padding:7px 18px;background:var(--bg3);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s">🔌 測試連線</button>';
         h += '<div id="bs-cloud-test-result" style="display:none;margin-top:10px;padding:9px 14px;border-radius:6px;font-size:.85rem;line-height:1.5"></div>';
       }
 
@@ -3211,6 +3243,14 @@ window.openBackendSettings = function(scrollToCloud) {
             setTimeout(function() { cloudH3.style.background = ''; }, 1500);
           }, 200);
         }
+      }
+      // ✅ 測試連線按鈕：SweetAlert2 會移除 onclick 屬性（DOMPurify sanitize），
+      //    必須在 didOpen 裡用 addEventListener 掛事件
+      var testBtn = document.getElementById('bs-cloud-test-btn');
+      if (testBtn) {
+        testBtn.addEventListener('mouseover', function() { this.style.background = 'rgba(201,150,58,0.15)'; });
+        testBtn.addEventListener('mouseout',  function() { this.style.background = 'var(--bg3)'; });
+        testBtn.addEventListener('click', window.testCloudConnection);
       }
     },
     preConfirm: function() {
