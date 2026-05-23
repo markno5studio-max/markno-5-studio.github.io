@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.06';
+const SITE_VERSION = '2026.05.23.07';
 
 /* ============================================================
    STORAGE KEY
@@ -644,149 +644,239 @@ function buildPublishData() {
 }
 
 /* ============================================================
+   CLOUD PUSH 輔助工具
+============================================================ */
+// 帶 timeout 的 fetch（預設 20 秒），超時自動中止並拋出 ETIMEOUT 錯誤
+function fetchWithTimeout(url, options, ms) {
+  ms = ms || 20000;
+  var ctrl = new AbortController();
+  var tid = setTimeout(function() { ctrl.abort(); }, ms);
+  return fetch(url, Object.assign({}, options, { signal: ctrl.signal }))
+    .then(function(r)  { clearTimeout(tid); return r; })
+    .catch(function(e) {
+      clearTimeout(tid);
+      if (e.name === 'AbortError') {
+        throw new Error('ETIMEOUT:GitHub API 回應逾時（' + Math.round(ms / 1000) + ' 秒），請檢查網路連線後重試');
+      }
+      throw e;
+    });
+}
+
+// Promise 版 sleep
+function cloudSleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+// 同步鎖定旗標：避免同時多個 cloudPush 互搶 SHA
+var _cloudPushRunning  = false;  // 目前是否有同步進行中
+var _cloudPushPending  = false;  // 同步進行中時又收到新請求，記錄為 pending
+var _cloudPushDebounce = null;   // saveChanges 的防抖 timer
+
+/* ============================================================
    CLOUD PUSH（儲存時自動同步到 GitHub，更新 content.js）
+   ── 防並發 ── 自動重試（最多 3 次）── 超時保護 ──
 ============================================================ */
 async function cloudPush(silent) {
   if (!CLOUD.token || !CLOUD.owner || !CLOUD.repo) {
     if (!silent) {
-      // 直接開啟後台設定並捲動到雲端同步區塊
       Swal.fire({
         title: '☁️ 尚未設定雲端同步',
         html: '只需設定一次 GitHub Token，之後每次儲存都會自動同步。<br><br>' +
               '<button onclick="Swal.close();setTimeout(function(){openBackendSettings(true);},100)" ' +
               'style="padding:8px 20px;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem">⚙️ 前往設定</button>',
-        icon: 'info',
-        showConfirmButton: false,
-        showCancelButton: true,
-        cancelButtonText: '稍後再說'
+        icon: 'info', showConfirmButton: false, showCancelButton: true, cancelButtonText: '稍後再說'
       });
     }
     return false;
   }
 
+  // ── 防並發鎖定 ──────────────────────────────────────────
+  if (_cloudPushRunning) {
+    // 若已有推送進行中，標記 pending 並直接返回；
+    // 本次推送完成後會自動補推一次
+    _cloudPushPending = true;
+    console.log('☁️ 已有同步進行中，稍後補推');
+    return false;
+  }
+  _cloudPushRunning = true;
+  _cloudPushPending = false;
+
   var branch  = CLOUD.branch || 'main';
   var apiUrl  = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
-  // ✅ Fine-grained PAT（github_pat_...）必須使用 Bearer，classic PAT（ghp_...）兩者均可
-  var authHeader = 'Bearer ' + CLOUD.token;
   var headers = {
-    'Authorization': authHeader,
+    'Authorization': 'Bearer ' + CLOUD.token,
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'Content-Type': 'application/json'
   };
 
-  // 更新管理列顯示
   showSyncStatus('☁️ 同步中…', 'syncing');
 
-  try {
-    // 1. 取得目前檔案的 SHA（更新檔案時必須）
-    var sha = null;
-    var shaRes = await fetch(apiUrl + '?ref=' + branch, { headers: headers });
-    if (shaRes.ok) {
-      var shaData = await shaRes.json();
-      sha = shaData.sha;
-      console.log('☁️ 已取得 SHA：' + sha);
-    } else if (shaRes.status === 404) {
-      console.log('☁️ content.js 尚不存在，將建立新檔案');
-    } else if (shaRes.status === 401) {
-      throw new Error('EAUTH:Token 驗證失敗（401）');
-    } else if (shaRes.status === 403) {
-      throw new Error('EPERM:Token 權限不足（403）');
-    } else {
-      throw new Error('無法取得檔案資訊（HTTP ' + shaRes.status + '）');
-    }
+  var MAX_RETRIES = 3;
+  var lastError   = null;
 
-    // 2. 產生 content.js 內容
-    var pub      = buildPublishData();
-    var date     = new Date().toLocaleString('zh-TW');
-    var jsContent =
-      '/* ================================================================\n' +
-      '   MK5 - Published Content (content.js)\n' +
-      '   Published: ' + date + '\n' +
-      '   Auto-generated. Do not edit manually.\n' +
-      '================================================================ */\n\n' +
-      'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
+  for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // ── 步驟 1：取得目前檔案 SHA ──────────────────────
+      var sha = null;
+      var shaRes = await fetchWithTimeout(apiUrl + '?ref=' + branch, { headers: headers }, 15000);
 
-    // 3. Base64 編碼（處理 UTF-8 中文）
-    var encoded = btoa(unescape(encodeURIComponent(jsContent)));
-
-    // 4. 上傳到 GitHub
-    var body = {
-      message: 'chore: auto-sync content ' + new Date().toISOString(),
-      content: encoded,
-      branch: branch
-    };
-    if (sha) body.sha = sha;
-
-    console.log('☁️ 上傳到：', apiUrl, '| branch:', branch, '| sha:', sha || '(新建)');
-    var res = await fetch(apiUrl, { method: 'PUT', headers: headers, body: JSON.stringify(body) });
-
-    if (!res.ok) {
-      var errData = {};
-      try { errData = await res.json(); } catch(ee) {}
-      console.error('☁️ PUT 失敗：', res.status, errData);
-
-      if (res.status === 401)       throw new Error('EAUTH:Token 驗證失敗，請確認 Token 是否正確或已過期。');
-      if (res.status === 403)       throw new Error('EPERM:Token 無寫入權限，請確認已勾選「Contents: Read and Write」。');
-      if (res.status === 404)       throw new Error('ENOREPO:找不到儲存庫或 Token 未授權此 Repo。\n請確認：①用戶名稱、儲存庫名稱是否正確 ②建立 Token 時是否有選取此儲存庫 ③是否勾選「Contents: Read and Write」');
-      if (res.status === 409)       throw new Error('衝突（409），請稍後再試。');
-      if (res.status === 422)       throw new Error('內容格式錯誤（422）：' + (errData.message || ''));
-      throw new Error((errData.message || '未知錯誤') + '（HTTP ' + res.status + '）');
-    }
-
-    // 5. 更新本地時間戳
-    D._publishedAt = pub._publishedAt;
-    window.MK5_PUBLISHED = pub;
-    PUBLISHED_AT = pub._publishedAt;
-    persist();
-
-    showSyncStatus('☁️ 已同步 ✓', 'success');
-    console.log('☁️ 同步成功！時間：', pub._publishedAt);
-    if (!silent) {
-      Swal.fire({
-        title: '☁️ 同步成功！',
-        html: '內容已自動上傳到 GitHub<br><small style="color:var(--t3)">手機重新整理即可看到最新內容 ✅</small>',
-        icon: 'success', timer: 2500, showConfirmButton: false
-      });
-    }
-    return true;
-
-  } catch(e) {
-    console.error('☁️ cloudPush 失敗：', e.message);
-    showSyncStatus('⚠️ 同步失敗', 'error');
-
-    if (!silent) {
-      // 解析錯誤代碼給出友善說明
-      var errMsg = e.message || '未知錯誤';
-      var errHint = '';
-      if (errMsg.startsWith('EAUTH:')) {
-        errMsg  = errMsg.slice(6);
-        errHint = '請至後台設定，重新輸入正確的 GitHub Token。';
-      } else if (errMsg.startsWith('EPERM:')) {
-        errMsg  = errMsg.slice(6);
-        errHint = '請重新建立 Token，在「Repository permissions」中將「Contents」設為「Read and Write」。';
-      } else if (errMsg.startsWith('ENOREPO:')) {
-        errMsg  = errMsg.slice(8);
-        errHint = '';
+      if (shaRes.ok) {
+        var shaData = await shaRes.json();
+        sha = shaData.sha;
+        console.log('☁️ SHA（第 ' + attempt + ' 次）：' + sha);
+      } else if (shaRes.status === 404) {
+        sha = null; // content.js 不存在，首次建立
+      } else if (shaRes.status === 401) {
+        throw new Error('EAUTH:Token 驗證失敗（401），請重新輸入正確的 GitHub Token。');
+      } else if (shaRes.status === 403) {
+        throw new Error('EPERM:Token 權限不足（403），請確認已勾選「Contents: Read and Write」。');
+      } else if (shaRes.status === 404) {
+        throw new Error('ENOREPO:找不到儲存庫，請確認用戶名稱與儲存庫名稱是否正確。');
+      } else if (shaRes.status === 429) {
+        // GitHub API 請求頻率限制
+        var retryAfter = parseInt(shaRes.headers.get('Retry-After') || '30', 10);
+        if (attempt < MAX_RETRIES) {
+          console.log('☁️ 請求頻率限制（429），等待 ' + retryAfter + ' 秒後重試');
+          await cloudSleep(Math.min(retryAfter * 1000, 30000));
+          continue;
+        }
+        throw new Error('請求頻率過高（429），請稍後再試。');
+      } else if (shaRes.status >= 500) {
+        // GitHub 伺服器錯誤，稍後重試
+        if (attempt < MAX_RETRIES) {
+          console.log('☁️ GitHub 伺服器錯誤（' + shaRes.status + '），' + (attempt * 2) + ' 秒後重試');
+          await cloudSleep(attempt * 2000);
+          continue;
+        }
+        throw new Error('GitHub 伺服器錯誤（HTTP ' + shaRes.status + '），請稍後再試。');
       } else {
-        errHint = '請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確。';
+        throw new Error('無法取得檔案資訊（HTTP ' + shaRes.status + '）');
       }
-      Swal.fire({
-        title: '☁️ 同步失敗',
-        html: '<div style="text-align:left;line-height:1.8;font-size:.88rem">' +
-              '<b style="color:#f87171">' + errMsg.replace(/\n/g,'<br>') + '</b>' +
-              (errHint ? '<br><br>' + errHint : '') +
-              '</div>',
-        icon: 'error',
-        confirmButtonText: '⚙️ 前往設定',
-        showCancelButton: true,
-        cancelButtonText: '關閉'
-      }).then(function(r) {
-        if (r.isConfirmed) openBackendSettings(true);
-      });
+
+      // ── 步驟 2：產生 content.js 內容 ──────────────────
+      var pub      = buildPublishData();
+      var date     = new Date().toLocaleString('zh-TW');
+      var jsContent =
+        '/* ================================================================\n' +
+        '   MK5 - Published Content (content.js)\n' +
+        '   Published: ' + date + '\n' +
+        '   Auto-generated. Do not edit manually.\n' +
+        '================================================================ */\n\n' +
+        'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
+
+      // ── 步驟 3：Base64 編碼（支援 UTF-8 中文） ─────────
+      var encoded = btoa(unescape(encodeURIComponent(jsContent)));
+
+      // ── 步驟 4：PUT 上傳 ─────────────────────────────
+      var body = {
+        message: 'chore: auto-sync content ' + new Date().toISOString(),
+        content: encoded,
+        branch: branch
+      };
+      if (sha) body.sha = sha;
+
+      console.log('☁️ PUT（第 ' + attempt + ' 次）→ sha:', sha || '(新建)');
+      var res = await fetchWithTimeout(apiUrl, {
+        method: 'PUT', headers: headers, body: JSON.stringify(body)
+      }, 25000);
+
+      if (!res.ok) {
+        var errData = {};
+        try { errData = await res.json(); } catch(ee) {}
+        console.warn('☁️ PUT 回應 ' + res.status + '：', errData);
+
+        if (res.status === 401) throw new Error('EAUTH:Token 驗證失敗，請確認 Token 是否正確或已過期。');
+        if (res.status === 403) throw new Error('EPERM:Token 無寫入權限，請確認已勾選「Contents: Read and Write」。');
+        if (res.status === 404) throw new Error('ENOREPO:找不到儲存庫或 Token 未授權此 Repo。\n請確認：①用戶名稱、儲存庫名稱是否正確 ②建立 Token 時是否有選取此儲存庫 ③是否勾選「Contents: Read and Write」');
+        if (res.status === 409) {
+          // SHA 衝突（並發寫入或 SHA 已過期）→ 重新取得 SHA 並立刻重試
+          if (attempt < MAX_RETRIES) {
+            console.log('☁️ SHA 衝突（409），重新取得 SHA 並重試（第 ' + attempt + ' 次）');
+            await cloudSleep(400);
+            continue;
+          }
+          throw new Error('多次 SHA 衝突，可能有其他裝置同時更新。請再次點擊「💾 儲存」。');
+        }
+        if (res.status === 422) throw new Error('內容格式錯誤（422）：' + (errData.message || ''));
+        if (res.status === 429) {
+          if (attempt < MAX_RETRIES) { await cloudSleep(30000); continue; }
+          throw new Error('請求頻率過高（429），請稍後再試。');
+        }
+        if (res.status >= 500) {
+          if (attempt < MAX_RETRIES) { await cloudSleep(attempt * 2000); continue; }
+        }
+        throw new Error((errData.message || '未知錯誤') + '（HTTP ' + res.status + '）');
+      }
+
+      // ── 步驟 5：成功，更新本地時間戳 ─────────────────
+      D._publishedAt = pub._publishedAt;
+      window.MK5_PUBLISHED = pub;
+      PUBLISHED_AT = pub._publishedAt;
+      persist();
+
+      showSyncStatus('☁️ 已同步 ✓', 'success');
+      console.log('☁️ 同步成功（第 ' + attempt + ' 次嘗試）！時間：', pub._publishedAt);
+      _cloudPushRunning = false;
+
+      // 若同步期間有新的儲存請求（pending），800ms 後補推一次
+      if (_cloudPushPending) {
+        _cloudPushPending = false;
+        console.log('☁️ 執行 pending 補推…');
+        setTimeout(function() { cloudPush(true); }, 800);
+      }
+
+      if (!silent) {
+        Swal.fire({
+          title: '☁️ 同步成功！',
+          html: '內容已自動上傳到 GitHub<br><small style="color:var(--t3)">手機重新整理即可看到最新內容 ✅</small>',
+          icon: 'success', timer: 2500, showConfirmButton: false
+        });
+      }
+      return true;
+
+    } catch(e) {
+      lastError = e;
+      var msg = e.message || '';
+      // 永久性錯誤（憑證問題、設定錯誤）→ 不重試
+      if (msg.startsWith('EAUTH:') || msg.startsWith('EPERM:') || msg.startsWith('ENOREPO:')) {
+        break;
+      }
+      if (attempt < MAX_RETRIES) {
+        console.warn('☁️ 第 ' + attempt + ' 次失敗，' + (attempt * 1500) + 'ms 後重試：', msg);
+        await cloudSleep(attempt * 1500);
+      }
     }
-    return false;
+  } // end retry loop
+
+  // ── 所有重試均失敗 ──────────────────────────────────
+  _cloudPushRunning = false;
+  _cloudPushPending = false;
+  console.error('☁️ cloudPush 最終失敗：', lastError && lastError.message);
+  showSyncStatus('⚠️ 同步失敗', 'error');
+
+  if (!silent) {
+    var errMsg  = (lastError && lastError.message) || '未知錯誤';
+    var errHint = '';
+    if (errMsg.startsWith('EAUTH:'))    { errMsg = errMsg.slice(6);  errHint = '請至後台設定重新輸入正確的 GitHub Token。'; }
+    else if (errMsg.startsWith('EPERM:'))   { errMsg = errMsg.slice(6);  errHint = '請重新建立 Token，在「Repository permissions」將「Contents」設為「Read and Write」。'; }
+    else if (errMsg.startsWith('ENOREPO:')) { errMsg = errMsg.slice(8); }
+    else if (errMsg.startsWith('ETIMEOUT:')){ errMsg = errMsg.slice(9); errHint = '請確認網路連線正常，或稍後再試。'; }
+    else { errHint = '請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確。'; }
+
+    Swal.fire({
+      title: '☁️ 同步失敗',
+      html: '<div style="text-align:left;line-height:1.8;font-size:.88rem">' +
+            '<b style="color:#f87171">' + errMsg.replace(/\n/g, '<br>') + '</b>' +
+            (errHint ? '<br><br><span style="color:var(--t2)">' + errHint + '</span>' : '') +
+            '</div>',
+      icon: 'error',
+      confirmButtonText: '⚙️ 前往設定',
+      showCancelButton: true,
+      cancelButtonText: '關閉'
+    }).then(function(r) { if (r.isConfirmed) openBackendSettings(true); });
   }
+  return false;
 }
 
 /* ============================================================
@@ -1529,8 +1619,11 @@ window.saveChanges = function(showAlert) {
   }
   persist(); updateDOM();
   if (showAlert) Swal.fire({ title:'✓ 儲存成功', timer:1200, showConfirmButton:false, icon:'success' });
-  // ☁️ 自動同步到 GitHub（靜默模式，已設定時才執行）
-  if (CU && CLOUD.token && CLOUD.owner && CLOUD.repo) cloudPush(true);
+  // ☁️ 自動同步到 GitHub（靜默，防抖 800ms：連續快速儲存只觸發一次推送）
+  if (CU && CLOUD.token && CLOUD.owner && CLOUD.repo) {
+    clearTimeout(_cloudPushDebounce);
+    _cloudPushDebounce = setTimeout(function() { cloudPush(true); }, 800);
+  }
 };
 
 /* ============================================================
