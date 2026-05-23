@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 上午12:58:16
+   Published: 2026/5/24 上午1:00:13
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -233,6 +233,12 @@ window.MK5_PUBLISHED = {
       "title": "通行無阻篇-國語版",
       "cat": "動畫製作",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/d63EfTHzQo4",
+      "title": "【中醫診所】皮膚炎篇",
+      "cat": "企業形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -281,7 +287,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T16:58:16.498Z",
+  "_publishedAt": "2026-05-23T17:00:13.443Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
