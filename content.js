@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 上午12:55:43
+   Published: 2026/5/24 上午12:57:03
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -209,6 +209,18 @@ window.MK5_PUBLISHED = {
       "title": "《吞食天地：３放置版 》 主題曲MV 15S",
       "cat": "品牌形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/ccbhQtKx6eA",
+      "title": "《吞食天地3：放置版》主題曲完整版",
+      "cat": "品牌形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/emWyV7MqWOY",
+      "title": "用路順暢篇-國語字幕版",
+      "cat": "動畫製作",
+      "description": ""
     }
   ],
   "theme": {
@@ -257,7 +269,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T16:55:43.166Z",
+  "_publishedAt": "2026-05-23T16:57:03.011Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
