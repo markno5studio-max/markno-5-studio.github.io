@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.01';
+const SITE_VERSION = '2026.05.23.02';
 
 /* ============================================================
    STORAGE KEY
@@ -819,9 +819,9 @@ function showSyncStatus(msg, type) {
     el = document.createElement('div');
     el.id = 'mk5-sync-status';
     el.style.cssText =
-      'position:fixed;bottom:16px;right:16px;padding:7px 16px;border-radius:8px;' +
-      'font-size:.8rem;z-index:99999;transition:opacity .5s;pointer-events:none;' +
-      'backdrop-filter:blur(8px);font-weight:500;letter-spacing:.03em';
+      'position:fixed;bottom:20px;right:20px;padding:10px 20px;border-radius:10px;' +
+      'font-size:.88rem;z-index:2147483647;transition:opacity .6s;pointer-events:none;' +
+      'backdrop-filter:blur(10px);font-weight:600;letter-spacing:.04em;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
     document.body.appendChild(el);
   }
   el.style.opacity = '1';
@@ -842,41 +842,56 @@ function showSyncStatus(msg, type) {
   clearTimeout(el._hideTimer);
   el._hideTimer = setTimeout(function() {
     el.style.opacity = '0';
-  }, type === 'success' ? 3000 : type === 'error' ? 6000 : 30000);
+  }, type === 'success' ? 6000 : type === 'error' ? 8000 : 60000);
 }
 
 /* ============================================================
-   TEST CLOUD CONNECTION（測試 GitHub 連線）
+   TEST CLOUD CONNECTION（測試 GitHub 連線 — 顯示於表單內，不開新 Swal）
 ============================================================ */
 window.testCloudConnection = async function() {
   var ownerEl  = document.getElementById('bs-cloud-owner');
   var repoEl   = document.getElementById('bs-cloud-repo');
   var tokenEl  = document.getElementById('bs-cloud-token');
-  if (!ownerEl || !repoEl || !tokenEl || !ownerEl.value.trim() || !repoEl.value.trim() || !tokenEl.value.trim()) {
-    Swal.fire({ title: '請先填入所有欄位', icon: 'warning', timer: 2000, showConfirmButton: false });
+  var resultEl = document.getElementById('bs-cloud-test-result');
+  if (!resultEl) return;
+
+  // 即時存入 CLOUD（不需等 preConfirm）
+  if (ownerEl)  CLOUD.owner  = ownerEl.value.trim();
+  if (repoEl)   CLOUD.repo   = repoEl.value.trim();
+  if (tokenEl)  CLOUD.token  = tokenEl.value.trim();
+  try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
+
+  function setResult(icon, msg, ok) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = ok ? 'rgba(0,160,80,0.15)' : 'rgba(181,32,32,0.15)';
+    resultEl.style.border     = ok ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(248,113,113,0.4)';
+    resultEl.style.color      = ok ? '#4ade80' : '#f87171';
+    resultEl.textContent      = icon + ' ' + msg;
+  }
+
+  if (!CLOUD.owner || !CLOUD.repo || !CLOUD.token) {
+    setResult('⚠️', '請先填入所有欄位', false);
     return;
   }
-  var apiUrl = 'https://api.github.com/repos/' + ownerEl.value.trim() + '/' + repoEl.value.trim() + '/contents/content.js';
+
+  resultEl.style.display = 'block';
+  resultEl.style.background = 'rgba(201,150,58,0.12)';
+  resultEl.style.border     = '1px solid rgba(201,150,58,0.4)';
+  resultEl.style.color      = '#C9963A';
+  resultEl.textContent      = '🔄 測試中…';
+
+  var apiUrl = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
   try {
     var res = await fetch(apiUrl, {
-      headers: {
-        'Authorization': 'token ' + tokenEl.value.trim(),
-        'Accept': 'application/vnd.github.v3+json'
-      }
+      headers: { 'Authorization': 'token ' + CLOUD.token, 'Accept': 'application/vnd.github.v3+json' }
     });
-    if (res.ok) {
-      Swal.fire({ title: '✅ 連線成功！', text: '已找到 content.js，可以正常同步', icon: 'success', timer: 2500, showConfirmButton: false });
-    } else if (res.status === 404) {
-      Swal.fire({ title: '✅ 連線成功！', text: '儲存庫已連通（content.js 尚不存在，首次儲存時會自動建立）', icon: 'success', timer: 3000, showConfirmButton: false });
-    } else if (res.status === 401) {
-      Swal.fire({ title: '❌ Token 無效', text: '請確認 GitHub Token 正確且未過期', icon: 'error' });
-    } else if (res.status === 403) {
-      Swal.fire({ title: '❌ 權限不足', text: 'Token 缺少 repo / contents:write 權限', icon: 'error' });
-    } else {
-      Swal.fire({ title: '❌ 連線失敗', text: 'HTTP ' + res.status + '，請確認用戶名稱與儲存庫名稱正確', icon: 'error' });
-    }
+    if (res.ok)           setResult('✅', '連線成功！已找到 content.js，可以正常同步。', true);
+    else if (res.status === 404) setResult('✅', '連線成功！儲存庫已連通（首次儲存時會自動建立 content.js）。', true);
+    else if (res.status === 401) setResult('❌', 'Token 無效，請確認 GitHub Token 正確且未過期。', false);
+    else if (res.status === 403) setResult('❌', '權限不足，Token 缺少 Contents → Read and Write 權限。', false);
+    else                         setResult('❌', '連線失敗（HTTP ' + res.status + '），請確認用戶名稱與儲存庫名稱正確。', false);
   } catch(e) {
-    Swal.fire({ title: '❌ 網路錯誤', text: e.message, icon: 'error' });
+    setResult('❌', '網路錯誤：' + (e.message || '無法連接到 GitHub'), false);
   }
 };
 
@@ -3081,24 +3096,37 @@ window.openBackendSettings = function(scrollToCloud) {
 
       // ─── 15. 雲端同步設定（super_admin 專用） ───
       if (isSuperAdmin) {
+        // 重新從 localStorage 取得最新 CLOUD 設定（確保顯示已儲存的值）
+        try {
+          var savedCloud = localStorage.getItem('MK5_CLOUD');
+          if (savedCloud) { Object.assign(CLOUD, JSON.parse(savedCloud)); }
+        } catch(e) {}
         var cloudOk = CLOUD.token && CLOUD.owner && CLOUD.repo;
         var cloudStatus = cloudOk
           ? '<span style="color:#4ade80">✅ 已設定（' + CLOUD.owner + '/' + CLOUD.repo + '）</span>'
           : '<span style="color:var(--t3)">⚪ 尚未設定</span>';
+        // 即時儲存 helper（inline oninput）
+        var saveCloudFn = "try{var o=document.getElementById('bs-cloud-owner'),r=document.getElementById('bs-cloud-repo'),b=document.getElementById('bs-cloud-branch'),t=document.getElementById('bs-cloud-token');if(o)CLOUD.owner=o.value.trim();if(r)CLOUD.repo=r.value.trim();if(b)CLOUD.branch=b.value.trim()||'main';if(t)CLOUD.token=t.value.trim();localStorage.setItem('MK5_CLOUD',JSON.stringify(CLOUD));}catch(e){}";
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ ☁️ 雲端同步設定</h3>';
         h += '<p style="font-size:.82rem;color:var(--t2);margin-bottom:14px;line-height:1.8">';
         h += '設定後，每次點擊「💾 儲存」將自動把最新內容同步到 GitHub。<br>';
         h += '其他裝置（手機等）重新整理網站即可看到最新資訊，無需手動操作。<br>';
         h += '目前狀態：' + cloudStatus + '</p>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub Token（Personal Access Token）：<input id="bs-cloud-token" class="swal2-input" style="margin-top:4px" type="password" value="' + (CLOUD.token||'') + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" oninput="' + saveCloudFn + '"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" oninput="' + saveCloudFn + '"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" oninput="' + saveCloudFn + '"></label>';
+        // Token 欄位：用 text 顯示（避免瀏覽器密碼管理器覆蓋 value），搭配 JS 遮罩
+        var tokenDisplay = CLOUD.token ? CLOUD.token : '';
+        h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">GitHub Token（Personal Access Token）：</label>';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+        h += '<input id="bs-cloud-token" class="swal2-input" style="margin:0;flex:1" type="text" value="' + tokenDisplay + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" oninput="' + saveCloudFn + '">';
+        h += '</div>';
         h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-bottom:12px;line-height:1.7">';
         h += '如何取得 Token：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>';
         h += '需要勾選：Repository → Contents → Read and Write 權限<br>';
-        h += '<b style="color:var(--gold)">⚠ Token 僅儲存在此裝置，不會上傳到 GitHub</b></small>';
+        h += '<b style="color:var(--gold)">⚠ Token 僅儲存在此裝置的 localStorage，不會上傳到 GitHub</b></small>';
         h += '<button type="button" onclick="testCloudConnection()" style="padding:7px 18px;background:var(--bg3);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s" onmouseover="this.style.background=\'rgba(201,150,58,0.15)\'" onmouseout="this.style.background=\'var(--bg3)\'">🔌 測試連線</button>';
+        h += '<div id="bs-cloud-test-result" style="display:none;margin-top:10px;padding:9px 14px;border-radius:6px;font-size:.85rem;line-height:1.5"></div>';
       }
 
       h += '</div>';
