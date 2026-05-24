@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 上午3:19:24
+   Published: 2026/5/24 下午4:19:40
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -105,7 +105,8 @@ window.MK5_PUBLISHED = {
     "音樂錄影帶",
     "動畫製作",
     "公家機關",
-    "短影音"
+    "短影音",
+    "活動宣傳"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -251,6 +252,12 @@ window.MK5_PUBLISHED = {
       "title": "【中醫診所】胃食道逆流篇",
       "cat": "企業形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/aVtFYBXIw7Y",
+      "title": "2022 苗栗海洋觀光音樂祭",
+      "cat": "活動宣傳",
+      "description": ""
     }
   ],
   "theme": {
@@ -299,7 +306,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-23T19:19:24.096Z",
+  "_publishedAt": "2026-05-24T08:19:40.683Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
