@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午5:59:49
+   Published: 2026/5/24 下午6:01:29
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -455,7 +455,7 @@ window.MK5_PUBLISHED = {
     "datetimeFont": "Bebas Neue"
   },
   "backendSettings": {
-    "autoLogoutMinutes": 30,
+    "autoLogoutMinutes": 0,
     "autoSaveSeconds": 60,
     "copyrightTemplate": "",
     "sendMessageEmail": "",
@@ -475,7 +475,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T09:59:49.647Z",
+  "_publishedAt": "2026-05-24T10:01:29.942Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
