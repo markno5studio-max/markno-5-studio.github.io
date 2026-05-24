@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午4:36:51
+   Published: 2026/5/24 下午4:38:34
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -373,6 +373,12 @@ window.MK5_PUBLISHED = {
       "title": "WINGMAN FGC2-中文字幕",
       "cat": "品牌形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/8kNDKE8tJFA",
+      "title": "frozhelen",
+      "cat": "品牌形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -421,7 +427,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T08:36:51.842Z",
+  "_publishedAt": "2026-05-24T08:38:34.882Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
