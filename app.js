@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.10';
+const SITE_VERSION = '2026.05.23.11';
 
 /* ============================================================
    STORAGE KEY
@@ -1519,26 +1519,18 @@ function renderServices() {
   var html = '';
   for (var i = 0; i < categories.length; i++) {
     var cat = categories[i];
-    
-    // 檢查是否要顯示此服務項目
+
+    // 只要類別在 pfCategories 中，就一定顯示（與分類保持 1:1 同步）
     var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
-    var shouldShow = true; // 預設顯示
     var desc = '專業' + cat + '製作服務';
-    
+
     if (svcData) {
-      // 新格式：{ description: '...', show: true/false }
       if (typeof svcData === 'object') {
-        shouldShow = svcData.show !== false; // 只有明確設為 false 才不顯示
         desc = svcData.description || desc;
       } else {
-        // 舊格式：字串（預設顯示）
         desc = svcData;
-        shouldShow = true;
       }
     }
-    // 如果沒有 svcData，代表是新分類，預設顯示
-    
-    if (!shouldShow) continue; // 跳過不顯示的項目
     
     // 取得 icon
     var icon = icons[cat] || 'fa-solid fa-film';
@@ -1569,17 +1561,8 @@ function renderServices() {
   if (footerServices) {
     var footerHtml = '';
     for (var i = 0; i < categories.length; i++) {
-      var cat = categories[i];
-      var svcData = D.serviceDescriptions && D.serviceDescriptions[cat];
-      var shouldShow = true; // 預設顯示
-      
-      if (svcData && typeof svcData === 'object') {
-        shouldShow = svcData.show !== false; // 只有明確設為 false 才不顯示
-      }
-      
-      if (shouldShow) {
-        footerHtml += '<li><a href="#services">' + cat + '</a></li>';
-      }
+      // 頁尾服務列表也與 pfCategories 保持 1:1 同步，不過濾 show 旗標
+      footerHtml += '<li><a href="#services">' + categories[i] + '</a></li>';
     }
     footerServices.innerHTML = footerHtml;
   }
@@ -3307,11 +3290,10 @@ window.openBackendSettings = function(scrollToCloud) {
         if (isSuperAdmin || canEdit('autoLogout')) {
           var _neverLogout  = bs.autoLogoutMinutes === 0;
           var _logoutMinVal = _neverLogout ? 30 : (bs.autoLogoutMinutes > 0 ? bs.autoLogoutMinutes : 5);
-          h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">46. 自動登出時間（分鐘）：</label>';
-          h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
-          h += '<input id="bs-auto-logout" class="swal2-input" style="margin:0;flex:1' + (_neverLogout ? ';opacity:.35' : '') + '" type="number" min="1" max="1440" value="' + _logoutMinVal + '" placeholder="30"' + (_neverLogout ? ' disabled' : '') + '>';
-          h += '<label style="white-space:nowrap;font-size:.85rem;cursor:pointer;user-select:none"><input type="checkbox" id="bs-never-logout"' + (_neverLogout ? ' checked' : '') + ' style="margin-right:5px;cursor:pointer;accent-color:var(--gold)"> 永不登出</label>';
-          h += '</div>';
+          h += '<label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.85rem">46. 自動登出時間（分鐘）：';
+          h += '<input id="bs-auto-logout" type="number" min="1" max="1440" value="' + _logoutMinVal + '" placeholder="30"' + (_neverLogout ? ' disabled' : '') + ' style="width:72px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border-g);color:var(--t1);border-radius:4px;font-size:.9rem;text-align:center' + (_neverLogout ? ';opacity:.35' : '') + '">';
+          h += '<label style="white-space:nowrap;cursor:pointer;user-select:none;font-size:.85rem"><input type="checkbox" id="bs-never-logout"' + (_neverLogout ? ' checked' : '') + ' style="margin-right:4px;cursor:pointer;accent-color:var(--gold)"> 永不登出</label>';
+          h += '</label>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
           h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">47. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
