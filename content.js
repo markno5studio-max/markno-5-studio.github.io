@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午8:09:24
+   Published: 2026/5/24 下午8:13:41
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -100,14 +100,14 @@ window.MK5_PUBLISHED = {
   "pfCategories": [
     "品牌形象廣告",
     "企業形象廣告",
-    "募資影片",
+    "Youtube 頻道",
     "活動紀錄",
     "音樂錄影帶",
     "動畫製作",
     "公家機關",
     "活動宣傳",
-    "Youtube 頻道",
-    "短影音"
+    "短影音",
+    "募資影片"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -475,7 +475,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T12:09:24.044Z",
+  "_publishedAt": "2026-05-24T12:13:41.242Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
