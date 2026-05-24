@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午4:21:19
+   Published: 2026/5/24 下午4:23:32
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -106,7 +106,8 @@ window.MK5_PUBLISHED = {
     "動畫製作",
     "公家機關",
     "短影音",
-    "活動宣傳"
+    "活動宣傳",
+    "Youtube 頻道"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -264,6 +265,18 @@ window.MK5_PUBLISHED = {
       "title": "【中醫診所】扁針篇",
       "cat": "企業形象廣告",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/gTp-IcEDFkI",
+      "title": "【中醫診所】美容針灸篇",
+      "cat": "企業形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/pUKA5PCMqww",
+      "title": "【網路行銷專家】",
+      "cat": "Youtube 頻道",
+      "description": ""
     }
   ],
   "theme": {
@@ -312,7 +325,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T08:21:19.852Z",
+  "_publishedAt": "2026-05-24T08:23:32.254Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
