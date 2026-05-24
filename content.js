@@ -1,7 +1,8 @@
 /* ================================================================
-   MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午5:37:26
-   Auto-generated. Do not edit manually.
+   馬克伍號影像工作室 - 發布內容 (content.js)
+   發布時間：2026/5/23 上午12:08:28
+   ⚠ 此檔案由後台「📤 發布到網站」自動生成，請勿手動修改
+   ✅ 將此檔案部署到 GitHub 後，所有裝置（含手機）將自動看到最新內容
 ================================================================ */
 
 window.MK5_PUBLISHED = {
@@ -28,16 +29,16 @@ window.MK5_PUBLISHED = {
   "label04": "04 · SELECTED WORKS",
   "label05": "05 · GET IN TOUCH",
   "aboutHeading": "關於馬克伍號",
-  "aboutDesc": "馬克伍號影像工作室，由 馬克斯 創立。 19 年影像製作經驗，從電視產業後期出發， 穿越節目製作、商業廣告與視覺設計領域。這不是單一技術的累積， 而是一種對影像語言的長時間觀察與理解。「5、4、3、2、1 —— Action。」每一段影像的誕生，都始於這五秒的倒數。那不只是拍攝前的準備，更是一種對專業的堅持、對細節的掌控，以及對成果的承諾。馬克伍號影像工作室 的名字，正源於這個影像人最熟悉的節奏。「伍號」，象徵著影像啟動前最關鍵的五秒，也代表我們在每一個專案中，從零到完成的全流程掌握與精準執行。我們理解畫面如何說話， 也理解觀眾如何感受。",
+  "aboutDesc": "馬克伍號影像工作室，由 馬克斯（Marcus） 創立。 19 年影像製作經驗，從電視產業後期出發， 穿越節目製作、商業廣告與視覺設計領域。這不是單一技術的累積， 而是一種對影像語言的長時間觀察與理解。我們理解畫面如何說話， 也理解觀眾如何感受。",
   "aboutTitle": "打造卓越視覺的<span style=\"color:var(--gold)\">專業影像夥伴</span>",
   "readyDesc": "我們的起點，來自於早期參與知名電視節目後期製作，在高強度製作環境中，磨練出對節奏、敘事與細節的極致要求。隨著經驗累積，逐步拓展至：<ul><li>節目製作與內容企劃</li><li>商業廣告與品牌形象影片</li><li>動畫設計與視覺特效（VFX / Motion Graphics）</li><li>數位內容與新媒體影像整合</li></ul><p style=\"margin-top:10px;font-size:.88rem;color:var(--t3)\">這些歷程，不只是技術的累積，更是對影像語言與市場溝通方式的深度理解。</p>",
   "readyTitle": "\"Ready.\" 準備好，創造價值",
-  "card1Desc": "我們從品牌定位與溝通目標出發，建立清晰的影像策略，讓每一支影片不只是好看，更能有效傳遞訊息與產生影響力。",
+  "card1Desc": "從客戶接洽的第一刻起，我們都已準備好以最專業的姿態，為您創造價值。",
   "missionTitle": "我們的理念與承諾",
   "card1Title": "經驗與專業的累積",
   "card1SubDesc": "創辦人擁有近 19 年深厚資歷，累積豐富實戰經驗與業界人脈。",
   "card2Title": "「伍號」的承諾與精神",
-  "card2Desc": "影像不只是紀錄，而是一種影響力。它可以說服、可以感動，也可以建立品牌。而這一切，都從那關鍵的五秒開始。馬克伍號影像工作室讓每一次倒數，都成為值得被記住的開始。",
+  "card2Desc": "在任何拍攝現場，五秒倒數是徹底準備與專業到位的訊號。",
   "servicesHeading": "專業服務項目",
   "servicesSub": "每個項目，都是一次精心策劃的視覺旅程。",
   "svc1Title": "動態影像拍攝",
@@ -102,12 +103,9 @@ window.MK5_PUBLISHED = {
     "企業形象廣告",
     "募資影片",
     "活動紀錄",
-    "音樂錄影帶",
-    "動畫製作",
-    "公家機關",
     "短影音",
-    "活動宣傳",
-    "Youtube 頻道"
+    "音樂錄影帶",
+    "動畫製作"
   ],
   "serviceDescriptions": {
     "品牌形象廣告": {
@@ -177,256 +175,10 @@ window.MK5_PUBLISHED = {
       "description": ""
     },
     {
-      "url": "https://youtu.be/lob_qhrZfNA",
-      "title": "新北市觀光",
-      "cat": "公家機關",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/CD1BMF-tdbg",
-      "title": "JOLLY & PHILIP婚宴",
-      "cat": "活動紀錄",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/wubbsrYNx18",
-      "title": "QDM表揚會",
-      "cat": "活動紀錄",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/4ItRvqUCGY8",
-      "title": "A2 Ultra social media video",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/JmUXNUueCL4",
-      "title": "《吞食天地：３放置版 》 主題曲MV 15S",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/ccbhQtKx6eA",
-      "title": "《吞食天地3：放置版》主題曲完整版",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/emWyV7MqWOY",
-      "title": "用路順暢篇-國語版",
-      "cat": "動畫製作",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/6Tc3I8RXJ4M",
-      "title": "行人安全篇-國語版",
-      "cat": "動畫製作",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/b9UCRZ5e7kE",
-      "title": "通行無阻篇-國語版",
-      "cat": "動畫製作",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/XDHZlEbl1PE",
-      "title": "淡水風雲音樂MV",
-      "cat": "音樂錄影帶",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/u6f28feU10w",
-      "title": "2022 東興圳光藝節 TVCF",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/aLLL0vAruEM",
-      "title": "【中醫診所】不孕症篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/xBze_AtYH-g",
-      "title": "【中醫診所】胃食道逆流篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/7RNST5WnBYg",
-      "title": "【中醫診所】轉骨篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/rTGuaD76jpY",
-      "title": "【中醫診所】扁針篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/gTp-IcEDFkI",
-      "title": "【中醫診所】美容針灸篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/d63EfTHzQo4",
-      "title": "【中醫診所】皮膚炎篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/jlyU2E9dPxs",
-      "title": "【中醫診所】不孕症篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/Uvmabk6fkFw",
-      "title": "【中醫診所】坐月子篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/f3xBcFjeaMQ",
-      "title": "【中醫診所】濕疹篇",
-      "cat": "企業形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/rbo-iu2_ilI",
-      "title": "【網路行銷專家】居家篇",
-      "cat": "Youtube 頻道",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/wCQLoEZZ3IY",
-      "title": "【網路行銷專家】-拍攝影片大公開",
-      "cat": "Youtube 頻道",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/pUKA5PCMqww",
-      "title": "【網路行銷專家】",
-      "cat": "Youtube 頻道",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/aVtFYBXIw7Y",
-      "title": "2022 苗栗海洋觀光音樂祭",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/nB76eoS4o58",
-      "title": "2023 桃園眷村文化節",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/BstGLDdcovc",
-      "title": "買賣房屋大哉問",
-      "cat": "Youtube 頻道",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/sYEEZFy_aLo",
-      "title": "【粒線體】",
-      "cat": "Youtube 頻道",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/QDCoXiUJKDk",
-      "title": "2023年 東森房屋-買方篇",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/m5OrvC5E3DA",
-      "title": "2023年 東森房屋-賣方篇",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/nRi4bi-IDFI",
-      "title": "東森房屋周年慶 一版",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/-2kInOjkqqM",
-      "title": "東森房屋週年慶 二版",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/Zw4-fBZTQUY",
-      "title": "WINGMAN FGC2-中文字幕",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/Stwc6vS0sLo",
-      "title": "Brook inside",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/8kNDKE8tJFA",
-      "title": "frozhelen",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/cIX61ogx8JA",
-      "title": "檸檬電子發票-字幕版",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/YVt7obnPMi4",
-      "title": "2025 桃園兒童藝術節",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/X6FVQdJxGo8",
-      "title": "妮維雅《小藍罐＆水水霜》完整版",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/0cv_Xa5JKCI",
-      "title": "妮維雅《小藍罐＆水水霜》60秒",
-      "cat": "品牌形象廣告",
-      "description": ""
-    },
-    {
-      "url": "https://youtu.be/dYLQDRBhZLQ",
-      "title": "2025 苗栗耶誕城",
-      "cat": "活動宣傳",
-      "description": ""
-    },
-    {
       "url": "https://youtube.com/shorts/ZdCQU3oMYP0",
       "title": "宏匯廣場活動短片-粉領篇",
       "cat": "短影音",
       "description": ""
-    },
-    {
-      "url": "https://youtube.com/shorts/R_tcgRRDX5Q",
-      "title": "宏匯廣場活動短片-顧客篇",
-      "cat": "短影音",
-      "description": ""
-    },
-    {
-      "url": "https://youtube.com/shorts/Ag_0hRUDyBo",
-      "title": "2026 魯冰花季",
-      "cat": "短影音",
-      "description": "2026 魯冰花季"
     }
   ],
   "theme": {
@@ -466,7 +218,7 @@ window.MK5_PUBLISHED = {
     "dragArrowHoverOpacity": 0.9,
     "dragArrowCooldown": 300,
     "dragArrowActiveGlow": 20,
-    "dragArrowIcon": "double",
+    "dragArrowIcon": "chevron",
     "pfGlowColor": "#C9963A",
     "pfGlowSize": 28,
     "pfGlowRange": 56,
@@ -475,8 +227,5 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T09:37:26.459Z",
-  "_cloudOwner": "markno5studio-max",
-  "_cloudRepo": "markno-5-studio.github.io",
-  "_cloudBranch": "main"
+  "_publishedAt": "2026-05-22T16:08:28.087Z"
 };

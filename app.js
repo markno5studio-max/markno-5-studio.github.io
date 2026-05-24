@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.08';
+const SITE_VERSION = '2026.05.23.10';
 
 /* ============================================================
    STORAGE KEY
@@ -2000,6 +2000,44 @@ document.addEventListener('DOMContentLoaded', function() {
   }, { passive: true });
 });
 
+/* ============================================================
+   CATEGORY TAB DRAG REORDER (admin only, direct DOM — inline handlers ok)
+============================================================ */
+var _dragCatIdx = -1;
+
+window.catDragStart = function(e, idx) {
+  _dragCatIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.45';
+};
+window.catDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.outline = '2px dashed var(--gold)';
+};
+window.catDragLeave = function(e) {
+  e.currentTarget.style.outline = '';
+};
+window.catDrop = function(e, idx) {
+  e.preventDefault();
+  e.currentTarget.style.outline = '';
+  if (_dragCatIdx === -1 || _dragCatIdx === idx) { _dragCatIdx = -1; return; }
+  var arr = D.pfCategories;
+  var moved = arr.splice(_dragCatIdx, 1)[0];
+  // Adjust insertion index because removal shifted elements after the drag origin
+  var insertAt = idx > _dragCatIdx ? idx - 1 : idx;
+  arr.splice(insertAt, 0, moved);
+  _dragCatIdx = -1;
+  persist();
+  renderPF();
+  renderServices();
+};
+window.catDragEnd = function(e) {
+  _dragCatIdx = -1;
+  e.currentTarget.style.opacity = '';
+  e.currentTarget.style.outline = '';
+};
+
 function renderPF() {
   var c = document.getElementById('portfolio-list'), f = document.getElementById('pf-filters');
   var paginationDiv = document.getElementById('pf-pagination');
@@ -2013,8 +2051,19 @@ function renderPF() {
       // 「全部」按鈕沒有刪除功能
       fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct + '\')">' + '全部' + '</button>';
     } else {
-      // 其他分類按鈕添加包裝和刪除鈕
-      fHtml += '<div class="filter-btn-wrap">';
+      // 其他分類按鈕添加包裝和刪除鈕；管理員模式下支援拖曳排序
+      var catPfIdx = i - 1; // D.pfCategories 的索引（cats[0]='All' 偏移 1）
+      if (CU) {
+        fHtml += '<div class="filter-btn-wrap" draggable="true" ' +
+          'ondragstart="catDragStart(event,' + catPfIdx + ')" ' +
+          'ondragover="catDragOver(event)" ' +
+          'ondragleave="catDragLeave(event)" ' +
+          'ondrop="catDrop(event,' + catPfIdx + ')" ' +
+          'ondragend="catDragEnd(event)" ' +
+          'style="cursor:grab">';
+      } else {
+        fHtml += '<div class="filter-btn-wrap">';
+      }
       fHtml += '<button class="filter-btn' + (ct === CF ? ' active' : '') + '" onclick="setFilter(\'' + ct.replace(/'/g, "\\'") + '\')">' + ct + '</button>';
       if (CU) {
         fHtml += '<button class="filter-del-btn" onclick="event.stopPropagation();deleteCategory(\'' + ct.replace(/'/g, "\\'") + '\')" title="刪除此分類">×</button>';
@@ -2362,7 +2411,7 @@ window.manageCategories = function() {
           '<div style="display:flex;gap:8px;margin-top:12px"><input id="catn" class="swal2-input" style="flex:1;margin:0" placeholder="新分類名稱">' +
           '<button onclick="if(document.getElementById(\'catn\').value.trim()){D.pfCategories.push(document.getElementById(\'catn\').value.trim());document.getElementById(\'catw\').innerHTML=lh();document.getElementById(\'catn\').value=\'\'}" style="background:var(--gold);border:none;color:var(--bg);padding:0 16px;cursor:pointer;font-weight:700">新增</button></div>',
     showCancelButton: true, confirmButtonText: '儲存'
-  }).then(function(r) { if (r.isConfirmed) { persist(); renderPF(); } });
+  }).then(function(r) { if (r.isConfirmed) { persist(); renderPF(); renderServices(); } });
 };
 
 /* ============================================================
@@ -2854,12 +2903,14 @@ window.showLoginModal = function() {
 ============================================================ */
 function startAutoLogout() {
   clearAutoLogout(); // 清除舊的計時器
-  
+
   if (!CU) return; // 未登入不需要計時
-  
-  var minutes = (D.backendSettings && D.backendSettings.autoLogoutMinutes) || 5;
+
+  var rawMinutes = D.backendSettings && D.backendSettings.autoLogoutMinutes;
+  if (rawMinutes === 0) return; // 永不登出，不設計時器
+  var minutes = (rawMinutes > 0) ? rawMinutes : 5; // 預設 5 分鐘
+
   var milliseconds = minutes * 60 * 1000;
-  
   autoLogoutTimer = setTimeout(function() {
     if (CU) {
       adminLogout();
@@ -3254,7 +3305,13 @@ window.openBackendSettings = function(scrollToCloud) {
       if (hasSysPermission) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 系統設定</h3>';
         if (isSuperAdmin || canEdit('autoLogout')) {
-          h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">46. 自動登出時間（分鐘）：<input id="bs-auto-logout" class="swal2-input" style="margin-top:4px" type="number" min="1" max="120" value="' + (bs.autoLogoutMinutes||5) + '" placeholder="5"></label>';
+          var _neverLogout  = bs.autoLogoutMinutes === 0;
+          var _logoutMinVal = _neverLogout ? 30 : (bs.autoLogoutMinutes > 0 ? bs.autoLogoutMinutes : 5);
+          h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">46. 自動登出時間（分鐘）：</label>';
+          h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
+          h += '<input id="bs-auto-logout" class="swal2-input" style="margin:0;flex:1' + (_neverLogout ? ';opacity:.35' : '') + '" type="number" min="1" max="1440" value="' + _logoutMinVal + '" placeholder="30"' + (_neverLogout ? ' disabled' : '') + '>';
+          h += '<label style="white-space:nowrap;font-size:.85rem;cursor:pointer;user-select:none"><input type="checkbox" id="bs-never-logout"' + (_neverLogout ? ' checked' : '') + ' style="margin-right:5px;cursor:pointer;accent-color:var(--gold)"> 永不登出</label>';
+          h += '</div>';
         }
         if (isSuperAdmin || canEdit('autoSave')) {
           h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">47. 自動儲存時間（秒）：<input id="bs-auto-save" class="swal2-input" style="margin-top:4px" type="number" min="10" max="600" value="' + (bs.autoSaveSeconds||60) + '" placeholder="60"></label>';
@@ -3362,6 +3419,15 @@ window.openBackendSettings = function(scrollToCloud) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('input', saveCloudFields);
       });
+      // ✅ 永不登出 checkbox：切換時啟用/停用數字輸入框
+      var neverLogoutCb = document.getElementById('bs-never-logout');
+      var logoutInput   = document.getElementById('bs-auto-logout');
+      if (neverLogoutCb && logoutInput) {
+        neverLogoutCb.addEventListener('change', function() {
+          logoutInput.disabled     = this.checked;
+          logoutInput.style.opacity = this.checked ? '0.35' : '1';
+        });
+      }
     },
     preConfirm: function() {
       var v = {};
@@ -3545,8 +3611,13 @@ window.openBackendSettings = function(scrollToCloud) {
 
       // 系統設定
       if (isSuperAdmin || canEdit('autoLogout')) {
-        var el = document.getElementById('bs-auto-logout');
-        if (el) v.autoLogout = el.value;
+        var neverEl  = document.getElementById('bs-never-logout');
+        var logoutEl = document.getElementById('bs-auto-logout');
+        if (neverEl && neverEl.checked) {
+          v.autoLogout = '0'; // 永不登出
+        } else if (logoutEl) {
+          v.autoLogout = logoutEl.value;
+        }
       }
       if (isSuperAdmin || canEdit('autoSave')) {
         var el = document.getElementById('bs-auto-save');
@@ -3625,7 +3696,11 @@ window.openBackendSettings = function(scrollToCloud) {
       if (v.dragArrowHoverOpacity !== undefined) D.backendSettings.dragArrowHoverOpacity = parseFloat(v.dragArrowHoverOpacity);
       if (v.dragArrowCooldown !== undefined) D.backendSettings.dragArrowCooldown = parseInt(v.dragArrowCooldown);
       if (v.dragArrowActiveGlow !== undefined) D.backendSettings.dragArrowActiveGlow = parseInt(v.dragArrowActiveGlow);
-      if (v.autoLogout !== undefined) D.backendSettings.autoLogoutMinutes = parseInt(v.autoLogout);
+      if (v.autoLogout !== undefined) {
+        var _logoutVal = parseInt(v.autoLogout, 10);
+        // 0 = 永不登出（哨兵值）；NaN 回退至預設 5 分鐘
+        D.backendSettings.autoLogoutMinutes = isNaN(_logoutVal) ? 5 : _logoutVal;
+      }
       if (v.autoSave !== undefined) D.backendSettings.autoSaveSeconds = parseInt(v.autoSave);
       if (v.copyright !== undefined) D.backendSettings.copyrightTemplate = v.copyright;
       if (v.email !== undefined) D.contactEmail = v.email;
