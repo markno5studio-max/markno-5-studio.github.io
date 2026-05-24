@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午4:19:40
+   Published: 2026/5/24 下午4:21:19
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -258,6 +258,12 @@ window.MK5_PUBLISHED = {
       "title": "2022 苗栗海洋觀光音樂祭",
       "cat": "活動宣傳",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/rTGuaD76jpY",
+      "title": "【中醫診所】扁針篇",
+      "cat": "企業形象廣告",
+      "description": ""
     }
   ],
   "theme": {
@@ -306,7 +312,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T08:19:40.683Z",
+  "_publishedAt": "2026-05-24T08:21:19.852Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
