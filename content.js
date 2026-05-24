@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午4:29:35
+   Published: 2026/5/24 下午4:30:33
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -313,6 +313,18 @@ window.MK5_PUBLISHED = {
       "title": "淡水風雲音樂MV",
       "cat": "音樂錄影帶",
       "description": ""
+    },
+    {
+      "url": "https://youtu.be/7RNST5WnBYg",
+      "title": "【中醫診所】轉骨篇",
+      "cat": "企業形象廣告",
+      "description": ""
+    },
+    {
+      "url": "https://youtu.be/BstGLDdcovc",
+      "title": "買賣房屋大哉問",
+      "cat": "Youtube 頻道",
+      "description": ""
     }
   ],
   "theme": {
@@ -361,7 +373,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T08:29:35.055Z",
+  "_publishedAt": "2026-05-24T08:30:33.764Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
