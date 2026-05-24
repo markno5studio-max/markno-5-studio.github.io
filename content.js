@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/5/24 下午5:15:01
+   Published: 2026/5/24 下午5:16:23
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -415,6 +415,18 @@ window.MK5_PUBLISHED = {
       "title": "宏匯廣場活動短片-粉領篇",
       "cat": "短影音",
       "description": ""
+    },
+    {
+      "url": "https://youtube.com/shorts/R_tcgRRDX5Q",
+      "title": "宏匯廣場活動短片-顧客篇",
+      "cat": "短影音",
+      "description": ""
+    },
+    {
+      "url": "https://youtube.com/shorts/Ag_0hRUDyBo",
+      "title": "2026 魯冰花季",
+      "cat": "短影音",
+      "description": "2026 魯冰花季"
     }
   ],
   "theme": {
@@ -463,7 +475,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-05-24T09:15:01.913Z",
+  "_publishedAt": "2026-05-24T09:16:23.063Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
