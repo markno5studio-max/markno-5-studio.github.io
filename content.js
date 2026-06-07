@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/6/7 上午10:51:11
+   Published: 2026/6/7 下午1:15:58
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -35,7 +35,7 @@ window.MK5_PUBLISHED = {
   "card1Desc": "我們從品牌定位與溝通目標出發，建立清晰的影像策略，讓每一支影片不只是好看，更能有效傳遞訊息與產生影響力。",
   "missionTitle": "我們的理念與承諾",
   "card1Title": "經驗與專業的累積",
-  "card1SubDesc": "創辦人擁有近 19 年深厚資歷，累積豐富實戰經驗與業界人脈。",
+  "card1SubDesc": "創辦人擁有近 20 年深厚資歷，累積豐富實戰經驗與業界人脈。",
   "card2Title": "「伍號」的承諾與精神",
   "card2Desc": "影像不只是紀錄，而是一種影響力。它可以說服、可以感動，也可以建立品牌。而這一切，都從那關鍵的五秒開始。馬克伍號影像工作室讓每一次倒數，都成為值得被記住的開始。",
   "servicesHeading": "專業服務項目",
@@ -475,7 +475,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-06-07T02:51:11.965Z",
+  "_publishedAt": "2026-06-07T05:15:58.413Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
