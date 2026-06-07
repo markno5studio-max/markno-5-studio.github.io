@@ -1,6 +1,6 @@
 /* ================================================================
    MK5 - Published Content (content.js)
-   Published: 2026/6/7 下午1:20:09
+   Published: 2026/6/7 下午1:21:09
    Auto-generated. Do not edit manually.
 ================================================================ */
 
@@ -475,7 +475,7 @@ window.MK5_PUBLISHED = {
   },
   "gmailUrl": "https://mail.google.com/mail/u/2/#inbox",
   "mailToAddress": "",
-  "_publishedAt": "2026-06-07T05:20:09.230Z",
+  "_publishedAt": "2026-06-07T05:21:09.123Z",
   "_cloudOwner": "markno5studio-max",
   "_cloudRepo": "markno-5-studio.github.io",
   "_cloudBranch": "main"
