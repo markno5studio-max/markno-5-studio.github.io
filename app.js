@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.08.04';
+const SITE_VERSION = '2026.06.09.01';
 
 /* ============================================================
    STORAGE KEY
@@ -776,6 +776,12 @@ async function saveAdmin(u) {
 
 var BOOTSTRAP_OWNER_EMAIL = 'markno.5.studio@gmail.com'; // 與 supabase_schema.sql 內設定的擁有者信箱一致
 
+// 📩 邀請碼通知信的固定收件信箱（指定信箱／擁有者）。
+//    新帳號一登入（待審核）就會自動把「申請人資訊 + 邀請碼」寄到這裡，
+//    擁有者收到後再把邀請碼轉交給要加入的人；對方輸入正確邀請碼即可進入後台，
+//    不需要超級執行長另外按「核准」。
+var INVITE_NOTIFY_EMAIL = 'markno.5.studio@gmail.com';
+
 /* 登入狀態變更：Google 登入後決定 已核准 / 待審核 / bootstrap */
 async function handleAuthState(user) {
   if (!user) {
@@ -888,8 +894,10 @@ async function fetchInviteCode() {
   } catch (e) { return ''; }
 }
 
-// 新帳號申請：寄「歡迎 + 邀請碼」信給申請人（to_email = 申請人本人）。
-// 申請人登入後（待審核）即可自動收到專屬邀請碼，輸入後立即成為一般編輯。
+// 新帳號登入（待審核）時：把「申請人資訊 + 邀請碼」寄到指定通知信箱
+// markno.5.studio@gmail.com（= INVITE_NOTIFY_EMAIL，不是寄給申請人本人）。
+// 擁有者收到後，再把邀請碼轉交給要加入的人；對方在待審核畫面輸入正確邀請碼，
+// 即可立即成為一般編輯——不需要超級執行長再按「核准」。
 async function sendApplicationEmail(user) {
   try {
     var cfg = _getEmailjsCfg();
@@ -916,15 +924,18 @@ async function sendApplicationEmail(user) {
     if (sessionStorage.getItem(flagKey)) return;
     sessionStorage.setItem(flagKey, '1');
 
+    // 收件者＝後台設定的「申請信箱」；未設定時退回預設的指定信箱 markno.5.studio@gmail.com。
+    var notifyTo = ((D && D.backendSettings && D.backendSettings.appEmail) || '').trim() || INVITE_NOTIFY_EMAIL;
+
     emailjs.send(cfg.serviceId, cfg.templateId, {
-      to_email:   user.email || '',                       // 收件者＝申請人本人
-      user_name:  user.displayName || '(未提供名稱)',
-      user_email: user.email || '',
+      to_email:   notifyTo,                               // ✅ 收件者＝指定通知信箱（擁有者），不是申請人本人
+      user_name:  user.displayName || '(未提供名稱)',      // 申請人名稱（信件內容顯示用）
+      user_email: user.email || '',                       // 申請人 Email（信件內容顯示用）
       site_name:  (D && D.brandName) || 'MARK NO.5',
       site_url:   location.origin,
-      invite_code: inviteCode                             // ✅ 自動帶入邀請碼，不再空白
+      invite_code: inviteCode                             // 邀請碼（請擁有者轉交給申請人）
     }, { publicKey: cfg.publicKey })
-      .then(function() { console.log('📧 已寄出歡迎信（含邀請碼）給', user.email); })
+      .then(function() { console.log('📧 已把邀請碼通知信寄到指定信箱', notifyTo, '（申請人：' + (user.email||'') + '）'); })
       .catch(function(err) {
         // 寄送失敗 → 清掉旗標，讓下次還能重試
         sessionStorage.removeItem(flagKey);
@@ -1008,10 +1019,10 @@ function showPendingScreen(user) {
   ov.innerHTML =
     '<button id="mk5-emg-btn" style="width:100%;max-width:560px;background:var(--bg3);border:1px solid var(--border);color:var(--t3);padding:14px;border-radius:12px;cursor:pointer;font-family:var(--serif);font-size:.9rem;text-align:center">⚙ 管理員緊急設定入口（僅開啟後台設定）</button>' +
     '<div style="width:100%;max-width:560px;background:var(--bg2);border:1px solid var(--border-g);border-radius:16px;padding:30px 26px;text-align:center">' +
-      '<div style="font-size:1.3rem;color:#5b8def;font-weight:700;margin-bottom:16px">🕐 帳號待審核</div>' +
+      '<div style="font-size:1.3rem;color:var(--gold);font-weight:700;margin-bottom:16px">🔑 請輸入邀請碼</div>' +
       '<div style="font-family:var(--display);letter-spacing:.08em;color:var(--t1);font-size:1.1rem">' + (name||'NEW USER') + '</div>' +
       '<div style="color:var(--t3);font-size:.85rem;margin:4px 0 14px">（' + email + '）</div>' +
-      '<div style="color:var(--t2);font-size:.9rem;line-height:1.9;margin-bottom:22px">您的帳號需要管理者審核後才能使用。<br>系統已通知管理者，請耐心等候，或向管理者索取邀請碼。</div>' +
+      '<div style="color:var(--t2);font-size:.9rem;line-height:1.9;margin-bottom:22px">系統已把邀請碼寄給管理者。<br>請向管理者索取邀請碼，輸入正確後即可立即進入後台（不需等待審核）。</div>' +
       '<div style="font-family:var(--display);letter-spacing:.12em;color:var(--gold);font-size:.8rem;margin-bottom:8px">邀請碼（6 位）</div>' +
       '<input id="mk5-invite" maxlength="6" inputmode="numeric" placeholder="輸入邀請碼..." style="width:100%;padding:14px;background:var(--bg);border:1px solid var(--border);color:var(--t1);font-size:1.1rem;text-align:center;letter-spacing:.3em;border-radius:10px;outline:none;margin-bottom:14px">' +
       '<button id="mk5-invite-btn" style="width:100%;padding:15px;background:var(--gold);color:var(--bg);border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:1rem;margin-bottom:10px">🔑 驗證邀請碼</button>' +
@@ -3405,7 +3416,7 @@ window.openBackendSettings = async function(scrollToCloud) {
         var ejs = bs.emailjs || {};
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 🔐 帳號審核 / 通知設定</h3>';
         // 申請信箱
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">申請信箱（新帳號申請通知寄到這裡）：<input id="bs-app-email" class="swal2-input" style="margin-top:4px" type="email" value="' + ((bs.appEmail||'').replace(/"/g,'&quot;')) + '" placeholder="markno.5.studio@gmail.com"></label>';
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">申請信箱（新帳號登入時，含邀請碼的通知信寄到這裡；留空＝預設 markno.5.studio@gmail.com）：<input id="bs-app-email" class="swal2-input" style="margin-top:4px" type="email" value="' + ((bs.appEmail||'').replace(/"/g,'&quot;')) + '" placeholder="markno.5.studio@gmail.com"></label>';
         // 邀請碼
         var curCode = (D && D._inviteCode) || '';
         h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">邀請碼（6 位，給對方輸入即可立即成為一般編輯）：<input id="bs-invite-code" class="swal2-input" style="margin-top:4px" maxlength="6" inputmode="numeric" value="' + curCode + '" placeholder="留空＝停用邀請碼"></label>';
@@ -3415,7 +3426,7 @@ window.openBackendSettings = async function(scrollToCloud) {
         h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">SERVICE ID：<input id="bs-emailjs-service" class="swal2-input" style="margin-top:4px" value="' + ((ejs.serviceId||'').replace(/"/g,'&quot;')) + '" placeholder="service_xxx" autocomplete="off"></label>';
         h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">TEMPLATE ID：<input id="bs-emailjs-template" class="swal2-input" style="margin-top:4px" value="' + ((ejs.templateId||'').replace(/"/g,'&quot;')) + '" placeholder="template_xxx" autocomplete="off"></label>';
         h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">PUBLIC KEY：<input id="bs-emailjs-public" class="swal2-input" style="margin-top:4px" value="' + ((ejs.publicKey||'').replace(/"/g,'&quot;')) + '" placeholder="xxxxxxxxxxxxx" autocomplete="off"></label>';
-        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px;line-height:1.7">模板變數：<b style="color:var(--gold)">{{to_email}}</b>、<b style="color:var(--gold)">{{user_name}}</b>、<b style="color:var(--gold)">{{user_email}}</b>、<b style="color:var(--gold)">{{site_name}}</b>、<b style="color:var(--gold)">{{site_url}}</b>、<b style="color:#4ade80">{{invite_code}}</b>（邀請碼，核准時自動填入）。</small>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px;line-height:1.7">模板變數：<b style="color:var(--gold)">{{to_email}}</b>、<b style="color:var(--gold)">{{user_name}}</b>、<b style="color:var(--gold)">{{user_email}}</b>、<b style="color:var(--gold)">{{site_name}}</b>、<b style="color:var(--gold)">{{site_url}}</b>、<b style="color:#4ade80">{{invite_code}}</b>（邀請碼，新帳號登入時自動寄到上方「申請信箱」）。<br>⚠ EmailJS 模板的「To Email」欄請填 <b>{{to_email}}</b>，信才會寄到指定信箱。</small>';
         // 緊急密碼
         h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">管理員緊急設定密碼：<input id="bs-emergency-pw" class="swal2-input" style="margin-top:4px" type="password" placeholder="設定新密碼（留空＝不變）" autocomplete="new-password"></label>';
         h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">目前：' + (bs.emergencyHash ? '<b style="color:#4ade80">已設定</b>' : '未設定') + '。用於登入畫面「緊急設定入口」（只開後台設定用）。</small>';
@@ -4343,8 +4354,9 @@ window.showUsers = function() {
           icon: 'info',
           html: '<div style="text-align:left;line-height:1.9;font-size:.9rem">' +
                 '1. 請對方用自己的 <b>Google 帳號</b>到本網站點「後台登入」。<br>' +
-                '2. 對方會看到「帳號待審核」畫面，申請通知會寄到申請信箱。<br>' +
-                '3. 你可在此「⏳ 待審核申請」清單按「核准」；或把 <b>邀請碼</b>給對方，對方輸入後即可立即成為一般編輯。' +
+                '2. 對方一登入，系統會自動把含 <b>邀請碼</b> 的通知信寄到管理信箱 <b>markno.5.studio@gmail.com</b>。<br>' +
+                '3. 你把信中的 <b>邀請碼</b> 轉交給對方，對方在「請輸入邀請碼」畫面輸入後，即可立即成為一般編輯（不需另外按核准）。<br>' +
+                '<small style="color:var(--t3)">＊若仍想手動審核，也可在下方「⏳ 待審核申請」清單按「核准」。</small>' +
                 '</div>',
           confirmButtonText: '了解'
         });
