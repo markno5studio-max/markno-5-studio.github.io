@@ -14,7 +14,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-<link rel="stylesheet" href="style.css?v=2026052311">
+<link rel="stylesheet" href="style.css?v=2026060804">
 </head>
 <body>
 <div id="intro-overlay">
@@ -198,7 +198,7 @@
       <div style="font-size:.84rem;color:var(--t2);margin-bottom:3px" data-key="footerCompany"></div>
       <span class="footer-copy" id="footer-copy-el"></span>
     </div>
-    <span class="footer-meta">Designed with ♥ · 馬克伍號影像工作室</span>
+    <span class="footer-meta">Designed with ♥ · 馬克伍號影像工作室 · <span id="site-ver-display" style="color:#C9963A"></span></span>
   </div>
 </footer>
 
@@ -224,17 +224,19 @@
   <div class="admin-ctrls">
     <button class="admin-btn" data-role="editor" onclick="editPortfolio(-1)">＋ 作品</button>
     <button class="admin-btn" data-role="editor" onclick="showAnalytics()">📊 數據</button>
-    <button class="admin-btn" data-role="editor" onclick="showInbox()">📩 來信</button>
     <button class="admin-btn" id="backend-settings-btn" onclick="openBackendSettings()">⚙️ 後台設定</button>
     <button class="admin-btn" data-role="super_admin" onclick="showUsers()">👥 帳號</button>
-    <button class="admin-btn" data-role="super_admin" onclick="cloudPush(false)" title="立即同步最新內容到 GitHub，所有裝置重新整理即可看到">☁️ 同步</button>
-
     <button class="admin-btn save" data-role="editor" onclick="saveChanges()">💾 儲存</button>
     <button class="admin-btn logout" data-role="editor" onclick="adminLogout()">登出</button>
   </div>
 </div>
 
-<script src="content.js?v=2026052311"></script>
-<script src="app.js?v=2026052311"></script>
+<!-- Supabase JS SDK（登入 + 資料庫 + 圖片/影片儲存，提供全域 supabase 物件） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- EmailJS（申請通知信） -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<script src="content.js?v=2026060902"></script>
+<script src="app.js?v=2026060902"></script>
 </body>
 </html>

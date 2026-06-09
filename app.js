@@ -2,24 +2,226 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.05.23.11';
+const SITE_VERSION = '2026.06.08.04';
 
 /* ============================================================
    STORAGE KEY
 ============================================================ */
 
-var KEY = 'MK5_DATA'; // 固定 key，不隨版本改變，避免資料遺失
+var KEY = 'MK5_DATA'; // 固定 key（僅用於相容/快取，主要資料存於 Supabase）
 
 /* ============================================================
-   CLOUD SYNC CONFIG（雲端同步，存於管理員裝置的 localStorage）
+   SUPABASE 設定（登入 + 資料庫 + 圖片/影片儲存，全部用 Supabase）
+   ──────────────────────────────────────────────────────────
+   • 登入  ：Supabase Auth（Google 登入）
+   • 資料庫：Supabase Postgres（資料表 mk5_kv / admins / applications）
+   • 檔案  ：Supabase Storage（bucket：media）；資料庫只存網址
+
+   👉 設定步驟（只需做一次，詳見交付說明）：
+     1. 到 https://supabase.com 建立免費專案。
+     2. SQL Editor 執行 supabase_schema.sql（建立資料表、權限、函式）。
+     3. Authentication → Providers → Google 啟用，填入 Google OAuth 用戶端 ID/密鑰，
+        並在 Authentication → URL Configuration 把你的網站網址加入 Redirect URLs。
+     4. Storage → New bucket「media」，打開 Public。
+     5. Project Settings → API，把 Project URL 與 Publishable key 填到下方。
 ============================================================ */
-var CLOUD = (function() {
-  try {
-    var s = localStorage.getItem('MK5_CLOUD');
-    return s ? Object.assign({ token:'', owner:'', repo:'', branch:'main' }, JSON.parse(s))
-             : { token:'', owner:'', repo:'', branch:'main' };
-  } catch(e) { return { token:'', owner:'', repo:'', branch:'main' }; }
-})();
+var SUPABASE_URL      = 'https://pnuhqvciedctovibrqmu.supabase.co';        // Project URL
+var SUPABASE_ANON_KEY = 'sb_publishable_NgpeQdfJufQP3wcSylXfjQ_hmQmZTlt';  // Publishable key（可公開）
+var SUPABASE_BUCKET   = 'media';                                           // Storage 的 bucket 名稱（需設為 Public）
+
+// 與 Postgres 資料表的對應；pk 是各表的主鍵欄位名稱
+var _COLL = {
+  'mk5_data':     { table: 'mk5_kv',       pk: 'id'  },  // 文件 main / private / analytics / secret
+  'admins':       { table: 'admins',       pk: 'uid' },
+  'applications': { table: 'applications', pk: 'uid' }
+};
+var FB_DELETE = '__MK5_DELETE_FIELD__'; // 取代舊的 FieldValue.delete()：set 時遇到此值即移除該欄位
+
+var sb = null;                 // Supabase 用戶端（全站共用）
+var db = null, storage = null, auth = null, googleProvider = { provider: 'google' };
+
+// 把 Supabase 的 user 物件正規化成程式各處慣用的欄位（uid / email / displayName / photoURL）
+function _normUser(u) {
+  if (!u) return null;
+  var m = u.user_metadata || {};
+  return {
+    uid: u.id,
+    email: (u.email || m.email || '').toLowerCase(),
+    displayName: m.full_name || m.name || (u.email || '').split('@')[0],
+    photoURL: m.avatar_url || m.picture || ''
+  };
+}
+
+// 移除值等於 FB_DELETE 的欄位（相容舊的「刪除欄位」語意）
+function _stripDeletes(obj) {
+  var out = {};
+  for (var k in obj) { if (obj.hasOwnProperty(k) && obj[k] !== FB_DELETE) out[k] = obj[k]; }
+  return out;
+}
+
+// 單一文件（doc）操作：get / set / delete，底層打 Supabase 資料表
+function _doc(coll, key) {
+  var c = _COLL[coll];
+  return {
+    get: async function() {
+      var r = await sb.from(c.table).select('data').eq(c.pk, key).maybeSingle();
+      if (r.error) throw r.error;
+      var exists = !!r.data;
+      var data = exists ? (r.data.data || {}) : null;
+      return { exists: exists, id: key, data: function() { return data; } };
+    },
+    set: async function(obj, opts) {
+      var clean = _stripDeletes(obj || {});
+      var payload = clean;
+      if (opts && opts.merge) {
+        var cur = await sb.from(c.table).select('data').eq(c.pk, key).maybeSingle();
+        var base = (cur.data && cur.data.data) || {};
+        payload = Object.assign({}, base, clean);
+      }
+      var row = { data: payload }; row[c.pk] = key;
+      // ✅ 修正：加上 onConflict 明確指定衝突欄位，避免 Supabase upsert 靜默失敗
+      var w = await sb.from(c.table).upsert(row, { onConflict: c.pk });
+      if (w.error) throw w.error;
+    },
+    delete: function() {
+      return sb.from(c.table).delete().eq(c.pk, key).then(function(w) { if (w.error) throw w.error; });
+    }
+  };
+}
+
+// 集合（collection）操作：doc(id) 取單一文件；get() 取全部
+function _collection(name) {
+  var c = _COLL[name];
+  return {
+    doc: function(key) { return _doc(name, key); },
+    get: async function() {
+      var r = await sb.from(c.table).select(c.pk + ', data');
+      if (r.error) throw r.error;
+      var rows = r.data || [];
+      return {
+        empty: rows.length === 0,
+        forEach: function(fn) {
+          rows.forEach(function(row) {
+            fn({ id: row[c.pk], data: function() { return row.data || {}; } });
+          });
+        }
+      };
+    }
+  };
+}
+
+// 初始化 Supabase（登入 + 資料庫 + 儲存）
+try {
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    console.error('⚠️ 找不到 Supabase SDK，請確認 index.html 已載入 supabase-js');
+  } else if (!SUPABASE_URL || SUPABASE_URL.indexOf('你的') !== -1 || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.indexOf('你的') !== -1) {
+    console.error('⚠️ 尚未填入 Supabase 金鑰（SUPABASE_URL / SUPABASE_ANON_KEY）');
+  } else {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    storage = sb; // uploadToStorage 透過 storage.storage.from(...) 上傳
+    db = { collection: _collection };
+
+    // Auth 轉接層：對外維持與舊程式相同的呼叫介面，底層改用 Supabase Auth
+    auth = {
+      setPersistence: function() { return Promise.resolve(); },
+      getRedirectResult: function() { return Promise.resolve(null); }, // Supabase 由 detectSessionInUrl 自動處理
+      onAuthStateChanged: function(cb) {
+        // onAuthStateChange 訂閱後會立即帶回目前 session（INITIAL_SESSION），作為唯一來源避免重複觸發
+        sb.auth.onAuthStateChange(function(_evt, session) {
+          cb(session ? _normUser(session.user) : null);
+        });
+      },
+      signInWithGoogle: function() {
+        return sb.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: location.origin + location.pathname,
+            queryParams: { prompt: 'select_account' }
+          }
+        }).then(function(r) { if (r.error) throw r.error; return true; });
+      },
+      signOut: function() { return sb.auth.signOut(); }
+    };
+
+    console.log('🗄️ Supabase 已連線（' + SUPABASE_URL.replace('https://', '').split('.')[0] + '・bucket：' + SUPABASE_BUCKET + '）');
+  }
+} catch (e) {
+  console.error('Supabase 初始化失敗：', e);
+}
+
+// 計算字串的 SHA-256 十六進位雜湊（緊急密碼用，不存明碼）
+async function sha256(str) {
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+/* ============================================================
+   SUPABASE STORAGE 上傳工具
+   ── 將圖片 / 影片上傳到 Supabase Storage，資料庫只保存回傳的公開網址 ──
+   ── 沒有 1MB 限制；Supabase 免費方案單一檔案預設上限為 50MB ──
+============================================================ */
+// canvas → Blob（優先用 toBlob，後備用 dataURL 轉換）
+function canvasToBlob(canvas, mime, quality) {
+  return new Promise(function(resolve, reject) {
+    try {
+      if (canvas.toBlob) {
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('canvas 轉檔失敗')); }, mime, quality);
+      } else {
+        var dataURL = canvas.toDataURL(mime, quality);
+        var parts = dataURL.split(','), bstr = atob(parts[1]);
+        var n = bstr.length, u8 = new Uint8Array(n);
+        while (n--) u8[n] = bstr.charCodeAt(n);
+        resolve(new Blob([u8], { type: mime }));
+      }
+    } catch(e) { reject(e); }
+  });
+}
+
+// 依副檔名推測 MIME 類型
+function guessContentType(ext, blob) {
+  if (blob && blob.type) return blob.type;
+  ext = (ext || '').toLowerCase();
+  var map = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    gif: 'image/gif', svg: 'image/svg+xml',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/x-m4v'
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+// 上傳 Blob/File 到 Supabase Storage，回傳「公開下載網址」。
+// folder：在 bucket 內的資料夾（例如 carousel / logo / avatars / portfolio）
+// ext   ：副檔名（jpg / png / mp4 …）
+async function uploadToStorage(blob, folder, ext) {
+  ext = ext || 'jpg';
+  if (!storage || !storage.storage) {
+    throw new Error('Supabase Storage 尚未設定。請打開 app.js 最上方，把 SUPABASE_URL 與 SUPABASE_ANON_KEY 換成你自己的金鑰。');
+  }
+  var path = (folder || 'uploads') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+  var contentType = guessContentType(ext, blob);
+  var res = await storage.storage.from(SUPABASE_BUCKET).upload(path, blob, {
+    contentType: contentType,
+    cacheControl: '31536000',
+    upsert: false
+  });
+  if (res && res.error) {
+    var msg = (res.error && (res.error.message || res.error.error)) || '未知錯誤';
+    if (/bucket not found/i.test(msg)) {
+      // ✅ 最常見問題：Supabase Storage 的 bucket 未建立
+      throw new Error('Supabase 上傳失敗：Storage bucket「' + SUPABASE_BUCKET + '」尚未建立。\n\n請到 Supabase 主控台 → Storage → New bucket，建立名稱為「' + SUPABASE_BUCKET + '」的 bucket，並打開「Public bucket」開關，再重試。');
+    }
+    if (/row-level security|not authorized|permission|policy/i.test(msg)) {
+      msg += '（請到 Supabase → Storage → ' + SUPABASE_BUCKET + ' → Policies 新增「允許上傳」的政策）';
+    }
+    throw new Error('Supabase 上傳失敗：' + msg);
+  }
+  var pub = storage.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+  var url = pub && pub.data && pub.data.publicUrl;
+  if (!url) throw new Error('上傳成功但無法取得公開網址，請確認 bucket「' + SUPABASE_BUCKET + '」已設為 Public。');
+  return url;
+}
 
 /* ============================================================
    FORCE CLEAR OLD CACHE
@@ -181,6 +383,9 @@ var DEF = {
     copyrightTemplate: '',
     sendMessageEmail: '',
     inboxGmailUrl: '',
+    appEmail: 'markno.5.studio@gmail.com', // 申請通知信箱（超級執行長可改）
+    emailjs: { serviceId: '', templateId: '', publicKey: '' }, // EmailJS 設定
+    emergencyHash: '', // 緊急設定入口密碼的 SHA-256（不存明碼）
     dragArrowColor: '#C9963A',
     dragArrowSize: 60,
     dragArrowOpacity: 0.4,
@@ -199,11 +404,9 @@ var DEF = {
   inbox: [],
   editLog: [],
   analytics: { pageViews:0, byDate:{}, byDevice:{}, bySource:{} },
-  users: [
-    { username:'mark', password:'mark888', role:'super_admin', name:'超級執行長 Mark', online:false, lastSeen:'', avatar:'', permissions:[] },
-    { username:'ops',  password:'ops888',  role:'ops_admin',   name:'營運長',           online:false, lastSeen:'', avatar:'', permissions:[] },
-    { username:'pro',  password:'pro123',  role:'editor',      name:'優秀人員',         online:false, lastSeen:'', avatar:'', permissions:[] }
-  ]
+  // 帳號改用 Supabase Auth（Google 登入）。第一位以擁有者信箱登入者自動成為 super_admin（見 handleAuthState）。
+  // 每筆 user 僅存 profile：{ email, role, name, permissions, online, lastSeen, avatar }，登入由 Supabase Auth 保管。
+  users: []
 };
 
 /* ============================================================
@@ -217,20 +420,19 @@ var PF_PER_PAGE = 12; // 4x3 佈局
 var autoLogoutTimer = null; // 自動登出計時器
 
 // 權限管理 - 可編輯項目（28項）
-var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowIcon','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText','cloudSync'];
+var EDITABLE_ITEMS = ['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','marqueeItems','marqueeColor','marqueeSpeed','marqueeShow','introLogoSize','datetimeSize','datetimeFont','heroEnFont','heroEnSize','heroZhSize','logo','carousel','categories','serviceDescriptions','socialFacebook','socialInstagram','socialThreads','socialYoutube','socialLine','rippleColor','rippleOpacity','rippleSize','rippleWidth','procNumOpacity','procNumHoverOpacity','dragArrowColor','dragArrowIcon','dragArrowSize','dragArrowOpacity','dragArrowHoverOpacity','dragArrowCooldown','dragArrowActiveGlow','pfGlowColor','pfGlowSize','pfGlowRange','pfGlowBrightness','pfGlowSoftness','autoLogout','autoSave','copyright','email','contactEmail','readyText'];
 var EDITABLE_NAMES = {
   introTagline:'開場動畫大標題',introTaglineSize:'開場動畫大標題大小',
   heroSubtitle:'首頁 Logo 下方小標',heroEnTitle:'首頁英文大標',heroZhTitle:'首頁中文副標',heroDesc:'首頁說明文字',
   marqueeItems:'最新公告內容',marqueeColor:'跑馬文字顏色',marqueeSpeed:'跑馬速度',marqueeShow:'顯示跑馬燈',
-  introLogoSize:'開場動畫 Logo 大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
+  introLogoSize:'首頁 Logo 動畫大小',datetimeSize:'日期時間天氣大小',heroEnFont:'英文大標字體',heroEnSize:'英文大標大小',heroZhSize:'中文副標大小',
   logo:'Logo 圖片',carousel:'輪播圖片',categories:'作品分類',serviceDescriptions:'服務項目說明',
   socialFacebook:'Facebook',socialInstagram:'Instagram',socialThreads:'Threads',socialYoutube:'YouTube',socialLine:'LINE ID',
   rippleColor:'光暈顏色',rippleOpacity:'光暈亮度',rippleSize:'光暈大小',rippleWidth:'光暈粗細',
   procNumOpacity:'流程數字亮度',procNumHoverOpacity:'流程數字 Hover 亮度',
   dragArrowColor:'拖曳箭頭顏色',dragArrowIcon:'拖曳箭頭樣式',dragArrowSize:'拖曳箭頭大小',dragArrowOpacity:'拖曳箭頭透明度',dragArrowHoverOpacity:'拖曳箭頭 Hover 透明度',dragArrowCooldown:'拖曳翻頁冷卻時間',dragArrowActiveGlow:'拖曳到箭頭時發光強度',
   pfGlowColor:'拖曳發光顏色',pfGlowSize:'拖曳發光大小',pfGlowRange:'拖曳發光範圍',pfGlowBrightness:'拖曳發光明亮',pfGlowSoftness:'拖曳發光柔化',
-  autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字',
-  cloudSync:'☁️ 雲端同步設定（49–52）'
+  autoLogout:'自動登出時間',autoSave:'自動儲存時間',copyright:'版權模板',email:'發送訊息 Email',contactEmail:'聯絡資訊 Email',readyText:'準備好了嗎文字'
 };
 
 /* ============================================================
@@ -461,16 +663,24 @@ function runIntro() {
 /* ============================================================
    BOOT
 ============================================================ */
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  // 🔴 版本標識 — 頁面底部顯示版本，確認部署是否成功
+  console.log('%c✅ MK5 app.js 版本：' + SITE_VERSION, 'color:#C9963A;font-size:16px;font-weight:bold');
+  var verEl = document.getElementById('site-ver-display');
+  if (verEl) verEl.textContent = 'v' + SITE_VERSION;
   document.addEventListener('click', function() { try { getAC(); } catch(e) {} }, { once: true });
-  loadData();
+  // 先讀公開內容（main + analytics）再渲染畫面
+  await loadPublic();
   applyTheme();
   updateDOM();
   runIntro();
   bindEvents();
-  // ☁️ 非同步從 GitHub 拉取最新內容（不阻擋初始渲染）
-  setTimeout(function() { cloudPull(); }, 800);
-  
+
+  // 監聽登入狀態（Supabase Auth 會自動保存/還原 session，並處理 Google 登入導回）
+  if (auth) {
+    auth.onAuthStateChanged(handleAuthState);
+  }
+
   // ESC 鍵關閉影片 modal
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' || e.keyCode === 27) {
@@ -490,663 +700,540 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-function loadData() {
+/* 載入公開內容：mk5_data/main（網站內容）+ mk5_data/analytics（瀏覽統計） */
+async function loadPublic() {
   try {
-    var s = localStorage.getItem(KEY); // KEY = 'MK5_DATA'（固定）
+    if (!db) throw new Error('Supabase 尚未初始化');
 
-    // ── 舊版本資料遷移：若 MK5_DATA 不存在，從 MK5_20xx.xx.xx 格式遷移 ──
-    if (!s) {
-      var oldKeys = Object.keys(localStorage).filter(function(k) {
-        return /^MK5_20\d{2}/.test(k);
-      });
-      if (oldKeys.length > 0) {
-        oldKeys.sort();
-        s = localStorage.getItem(oldKeys[oldKeys.length - 1]);
-        if (s) {
-          console.log('✅ 已從舊版本遷移資料：' + oldKeys[oldKeys.length - 1]);
-          localStorage.setItem(KEY, s);
-          oldKeys.forEach(function(k) { localStorage.removeItem(k); });
-        }
-      }
-    }
-
-    if (s) {
-      var p = JSON.parse(s);
+    var mainSnap = await db.collection('mk5_data').doc('main').get();
+    if (mainSnap.exists) {
+      var p = mainSnap.data() || {};
       D = Object.assign({}, DEF, p);
       D.social = Object.assign({}, DEF.social, p.social || {});
-      D.analytics = Object.assign({}, DEF.analytics, p.analytics || {});
       D.theme = Object.assign({}, DEF.theme, p.theme || {});
+      D.backendSettings = Object.assign({}, DEF.backendSettings, p.backendSettings || {});
+      D.backendSettings.emailjs = Object.assign({}, DEF.backendSettings.emailjs, (p.backendSettings && p.backendSettings.emailjs) || {});
       if (!D.logoData || D.logoData.length < 50) D.logoData = DEF.logoData;
       if (!D.carouselImages || !D.carouselImages.length) D.carouselImages = DEF.carouselImages.slice();
       if (!D.pfCategories || !D.pfCategories.length) D.pfCategories = DEF.pfCategories.slice();
       if (!D.formChecklist || !D.formChecklist.length) D.formChecklist = DEF.formChecklist.slice();
-      if (!D.users || !D.users.length) D.users = JSON.parse(JSON.stringify(DEF.users));
-      if (!D.editLog) D.editLog = [];
-
-      // ── 檢查是否有比 localStorage 更新的發布內容（content.js）──
-      var savedPublishedAt = D._publishedAt || '';
-      if (PUBLISHED_AT && PUBLISHED_AT > savedPublishedAt) {
-        mergePublishedContent();
-      }
-
+      console.log('☁️ 已從 Supabase 載入公開內容');
     } else {
-      // 沒有 localStorage 資料 → 使用 content.js 發布內容，或 DEF 預設值
-      if (window.MK5_PUBLISHED && typeof window.MK5_PUBLISHED === 'object') {
-        D = Object.assign({}, DEF, window.MK5_PUBLISHED);
-        D.social = Object.assign({}, DEF.social, window.MK5_PUBLISHED.social || {});
-        D.analytics = Object.assign({}, DEF.analytics);
-        D.theme = Object.assign({}, DEF.theme, window.MK5_PUBLISHED.theme || {});
-        if (!D.logoData || D.logoData.length < 50) D.logoData = DEF.logoData;
-        if (!D.carouselImages || !D.carouselImages.length) D.carouselImages = DEF.carouselImages.slice();
-        if (!D.users || !D.users.length) D.users = JSON.parse(JSON.stringify(DEF.users));
-        if (!D.editLog) D.editLog = [];
-        D._publishedAt = PUBLISHED_AT;
-        console.log('✅ 已載入已發布內容（content.js）');
-      } else {
-        D = JSON.parse(JSON.stringify(DEF));
-      }
-      persist();
+      // 雲端尚無內容 → 套用預設值（待管理員登入後 persist 才會建立）
+      D = JSON.parse(JSON.stringify(DEF));
+      console.log('☁️ 雲端尚無內容，暫用預設值');
     }
+    // users/editLog/inbox 屬私有或已停用資料，公開階段一律不保留
+    // （避免舊版 main 文件殘留的帳號/密碼被讀入記憶體；登入後由 loadPrivate 提供 users）
+    D.users = [];
+    D.editLog = [];
+    delete D.inbox;
+
+    // analytics 為獨立公開文件
+    try {
+      var anSnap = await db.collection('mk5_data').doc('analytics').get();
+      D.analytics = Object.assign({}, DEF.analytics, (anSnap.exists ? anSnap.data() : null) || {});
+    } catch(e) { D.analytics = Object.assign({}, DEF.analytics); }
   } catch(e) {
+    console.error('讀取公開內容失敗，套用預設值：', e);
     D = JSON.parse(JSON.stringify(DEF));
   }
-  try { var cu = sessionStorage.getItem('mk5cu'); if (cu) CU = JSON.parse(cu); } catch(e) {}
-  
-  // 如果已登入，啟動自動登出計時器
-  if (CU) {
-    startAutoLogout(); startAutoSave();
-  }
 }
 
-/* ============================================================
-   MERGE PUBLISHED CONTENT（同步 content.js 發布的資料）
-============================================================ */
-function mergePublishedContent() {
-  if (!window.MK5_PUBLISHED || typeof window.MK5_PUBLISHED !== 'object') return;
-  var pub = window.MK5_PUBLISHED;
-
-  // 只更新內容欄位，不覆蓋用戶帳號、來信、分析資料
-  var contentFields = [
-    'logoData','logoType','brandName','introTagline','introTaglineSize',
-    'marqueeItems','marqueeColor','marqueeSpeed','marqueeShow',
-    'heroSubtitle','heroEnTitle','heroZhTitle','heroDesc',
-    'label01','label02','label03','label04','label05',
-    'aboutHeading','aboutDesc','aboutTitle','readyDesc','readyTitle',
-    'card1Desc','missionTitle','card1Title','card1SubDesc','card2Title','card2Desc',
-    'servicesHeading','servicesSub','processHeading','processSub',
-    'svc1Title','svc1Desc','svc2Title','svc2Desc','svc3Title','svc3Desc',
-    'svc4Title','svc4Desc','svc5Title','svc5Desc','svc6Title','svc6Desc','svc7Title','svc7Desc',
-    'procTitle1','procTitle2','procTitle3','procTitle4','procTitle5','procTitle6','procTitle7','procTitle8',
-    'procDesc1','procDesc2','procDesc3','procDesc4','procDesc5','procDesc6','procDesc7','procDesc8',
-    'portfolioHeading','contactTitle','contactDesc','contactEmail','formNote',
-    'footerTagline','readyText','footerCompany','footerCopyTpl',
-    'portfolio','pfCategories','serviceDescriptions','formChecklist','carouselImages',
-    'gmailUrl','mailToAddress'
-  ];
-
-  contentFields.forEach(function(field) {
-    if (pub[field] !== undefined) D[field] = pub[field];
-  });
-
-  if (pub.social) D.social = Object.assign({}, D.social, pub.social);
-  if (pub.theme)  D.theme  = Object.assign({}, D.theme,  pub.theme);
-  if (pub.backendSettings) D.backendSettings = Object.assign({}, D.backendSettings, pub.backendSettings);
-
-  D._publishedAt = PUBLISHED_AT;
-  persist();
-  console.log('✅ 已套用最新發布內容（' + PUBLISHED_AT + '）');
+/* 載入私有資料：editLog（mk5_data/private）+ 全部管理員（admins 集合）→ D.users */
+async function loadPrivate() {
+  if (!db) return;
+  try {
+    var snap = await db.collection('mk5_data').doc('private').get();
+    var pv = (snap.exists ? snap.data() : null) || {};
+    // 載入時就整理：丟棄舊版指數膨脹的巨大快照，避免占用記憶體與下次寫入超量
+    D.editLog = sanitizeEditLog(pv.editLog || []);
+  } catch(e) { console.error('讀取 editLog 失敗：', e); }
+  try {
+    var qs = await db.collection('admins').get();
+    var arr = [];
+    qs.forEach(function(doc) { arr.push(Object.assign({ uid: doc.id }, doc.data())); });
+    D.users = arr;
+  } catch(e) { console.error('讀取管理員清單失敗：', e); }
+  // 邀請碼（僅 super 讀得到；其他角色規則會擋下，靜默忽略）
+  try {
+    var s = await db.collection('mk5_data').doc('secret').get();
+    D._inviteCode = (s.exists && s.data().inviteCode) || '';
+  } catch(e) { D._inviteCode = ''; }
 }
 
-/* ============================================================
-   GENERATE PUBLISH FILE（生成 content.js，讓手機也能看到最新內容）
-============================================================ */
-// 備用：手動下載 content.js（無法設定 GitHub Token 時使用）
-window.generatePublishFile = function() {
-  if (!CU || CU.role !== 'super_admin') {
-    Swal.fire({ title: '無權限', text: '只有超級執行長才能執行此操作', icon: 'error' });
+// 寫入單一管理員 profile（admins 資料表）：經由 Supabase 安全函式，權限由資料庫把關
+async function saveAdmin(u) {
+  if (!sb || !u || !u.uid) return;
+  var profile = {
+    email: (u.email || '').toLowerCase(), name: u.name || '', role: u.role || 'editor',
+    permissions: u.permissions || [], avatar: u.avatar || '',
+    online: !!u.online, lastSeen: u.lastSeen || ''
+  };
+  var r = await sb.rpc('upsert_admin', { p_uid: u.uid, p_data: profile });
+  if (r && r.error) throw r.error;
+}
+
+var BOOTSTRAP_OWNER_EMAIL = 'markno.5.studio@gmail.com'; // 與 supabase_schema.sql 內設定的擁有者信箱一致
+
+/* 登入狀態變更：Google 登入後決定 已核准 / 待審核 / bootstrap */
+async function handleAuthState(user) {
+  if (!user) {
+    CU = null;
+    clearAutoLogout(); clearAutoSave();
+    hidePendingScreen();
+    updateDOM();
     return;
   }
-  var pub  = buildPublishData();
-  var date = new Date().toLocaleString('zh-TW');
-  var jsContent =
-    '/* ================================================================\n' +
-    '   馬克伍號影像工作室 - 發布內容 (content.js)\n' +
-    '   發布時間：' + date + '\n' +
-    '   ⚠ 此檔案由後台自動生成，請勿手動修改\n' +
-    '================================================================ */\n\n' +
-    'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
-  var blob = new Blob([jsContent], { type: 'text/javascript;charset=utf-8' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  a.href = url; a.download = 'content.js';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-  Swal.fire({ title: '📥 content.js 已下載', text: '請將此檔案上傳到 GitHub 以同步到所有裝置', icon: 'success', timer: 3000, showConfirmButton: false });
-};
+  var email = (user.email || '').toLowerCase();
+  var uid = user.uid;
 
-/* ============================================================
-   BUILD PUBLISH DATA（建立可發布的公開資料，排除敏感資訊）
-============================================================ */
-function buildPublishData() {
-  var pub = JSON.parse(JSON.stringify(D));
-  delete pub.users;
-  delete pub.inbox;
-  delete pub.analytics;
-  delete pub.editLog;
-  pub._publishedAt = new Date().toISOString();
-  // 將雲端來源資訊寫入，讓所有裝置知道從哪裡拉取最新資料
-  if (CLOUD.owner && CLOUD.repo) {
-    pub._cloudOwner  = CLOUD.owner;
-    pub._cloudRepo   = CLOUD.repo;
-    pub._cloudBranch = CLOUD.branch || 'main';
-  }
-  return pub;
-}
-
-/* ============================================================
-   CLOUD PUSH 輔助工具
-============================================================ */
-// 帶 timeout 的 fetch（預設 20 秒），超時自動中止並拋出 ETIMEOUT 錯誤
-function fetchWithTimeout(url, options, ms) {
-  ms = ms || 20000;
-  var ctrl = new AbortController();
-  var tid = setTimeout(function() { ctrl.abort(); }, ms);
-  return fetch(url, Object.assign({}, options, { signal: ctrl.signal }))
-    .then(function(r)  { clearTimeout(tid); return r; })
-    .catch(function(e) {
-      clearTimeout(tid);
-      if (e.name === 'AbortError') {
-        throw new Error('ETIMEOUT:GitHub API 回應逾時（' + Math.round(ms / 1000) + ' 秒），請檢查網路連線後重試');
-      }
-      throw e;
-    });
-}
-
-// Promise 版 sleep
-function cloudSleep(ms) {
-  return new Promise(function(resolve) { setTimeout(resolve, ms); });
-}
-
-// 同步鎖定旗標：避免同時多個 cloudPush 互搶 SHA
-var _cloudPushRunning  = false;  // 目前是否有同步進行中
-var _cloudPushPending  = false;  // 同步進行中時又收到新請求，記錄為 pending
-var _cloudPushDebounce = null;   // saveChanges 的防抖 timer
-
-/* ============================================================
-   CLOUD PUSH（儲存時自動同步到 GitHub，更新 content.js）
-   ── 防並發 ── 自動重試（最多 3 次）── 超時保護 ──
-============================================================ */
-async function cloudPush(silent) {
-  if (!CLOUD.token || !CLOUD.owner || !CLOUD.repo) {
-    if (!silent) {
+  // ⛔ 黑名單檢查：被停權者一律登出，不得進入後台或待審畫面。
+  //   （DB 端 redeem_invite 也會擋，這裡只是給使用者明確提示。函式未部署時自動略過。）
+  try {
+    var _bl = await sb.rpc('is_blacklisted');
+    if (_bl && !_bl.error && _bl.data === true) {
+      if (auth) await auth.signOut();
+      CU = null; clearAutoLogout(); clearAutoSave(); hidePendingScreen(); updateDOM();
       Swal.fire({
-        title: '☁️ 尚未設定雲端同步',
-        html: '只需設定一次 GitHub Token，之後每次儲存都會自動同步。<br><br>' +
-              '<button onclick="Swal.close();setTimeout(function(){openBackendSettings(true);},100)" ' +
-              'style="padding:8px 20px;background:var(--gold);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem">⚙️ 前往設定</button>',
-        icon: 'info', showConfirmButton: false, showCancelButton: true, cancelButtonText: '稍後再說'
+        title: '⛔ 帳號已被停權',
+        html: '您的帳號已被管理員停權，目前無法登入。<br>如有疑問，請聯絡管理者。',
+        icon: 'error', confirmButtonText: '我知道了'
+      });
+      return;
+    }
+  } catch(e) {}
+
+  // 讀自己的 admins/{uid}
+  var meSnap = null;
+  try { meSnap = await db.collection('admins').doc(uid).get(); } catch(e) {}
+
+  // Bootstrap：第一位以指定信箱登入者 → 自動建立 super_admin（由 Supabase 安全函式處理）
+  if ((!meSnap || !meSnap.exists) && email === BOOTSTRAP_OWNER_EMAIL) {
+    try {
+      var br = await sb.rpc('bootstrap_owner');
+      if (br && br.error) throw br.error;
+      meSnap = await db.collection('admins').doc(uid).get();
+    } catch(e) {
+      // 擁有者 bootstrap 失敗 → 多半是 supabase_schema.sql 尚未在 Supabase 執行
+      console.error('bootstrap 失敗：', e);
+      CU = null; clearAutoLogout(); clearAutoSave(); hidePendingScreen(); updateDOM();
+      Swal.fire({
+        title: '⚠ 初始化失敗（資料庫尚未建立）',
+        html: '無法建立超級執行長帳號：<br><b style="color:#f87171">' + (e.message || e.code || e) + '</b><br><br>' +
+              '請到 Supabase 主控台 → <b>SQL Editor</b>，貼上並執行 <b>supabase_schema.sql</b>（會建立資料表、權限與函式），<br>' +
+              '且函式中的擁有者信箱必須是 <b>markno.5.studio@gmail.com</b>。',
+        icon: 'error', confirmButtonText: '我知道了'
+      });
+      return;
+    }
+  }
+
+  if (meSnap && meSnap.exists) {
+    // ── 已核准 ──
+    hidePendingScreen();
+    CU = Object.assign({ uid: uid }, meSnap.data());
+    await loadPrivate();
+    // 更新自己的在線狀態
+    CU.online = true; CU.lastSeen = new Date().toLocaleString('zh-TW');
+    try { await saveAdmin(CU); } catch(e) {}
+    // 清掉自己殘留的待審核申請（先前失敗嘗試留下的）
+    try { db.collection('applications').doc(uid).delete().catch(function(){}); } catch(e) {}
+    updateDOM();
+    startAutoLogout(); startAutoSave();
+    maybePromptFirstSetup(); // 超級執行長首次（EmailJS 未設定）→ 引導去設定
+  } else {
+    // ── 待審核 ──
+    CU = null;
+    clearAutoLogout(); clearAutoSave();
+    try {
+      await db.collection('applications').doc(uid).set({
+        email: email, name: user.displayName || '', photoURL: user.photoURL || '',
+        requestedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch(e) { console.error('寫入申請失敗：', e); }
+    sendApplicationEmail(user); // 自動寄通知（同 session 只寄一次）
+    updateDOM();
+    showPendingScreen(user);
+  }
+}
+
+/* ============================================================
+   申請通知 / 邀請碼寄送（EmailJS）
+============================================================ */
+function _getEmailjsCfg() {
+  var bs = (D && D.backendSettings) || {};
+  return bs.emailjs || {};
+}
+
+// 取得邀請碼（給寄信用）。順序：
+//   1) 記憶體已載入 → 直接用
+//   2) 安全函式 get_invite_code()（任何「已登入者」皆可，含待審核申請者；匿名訪客取不到）
+//   3) 後備：直接讀 secret（僅 super 有權）
+// ⚠ 需先在 Supabase 執行最新版 supabase_schema.sql（內含 get_invite_code 函式），否則步驟 2 會失敗。
+async function fetchInviteCode() {
+  if (D && D._inviteCode) return D._inviteCode;
+  try {
+    if (sb && sb.rpc) {
+      var r = await sb.rpc('get_invite_code');
+      if (!r.error && r.data) { D._inviteCode = r.data; return r.data; }
+      if (r && r.error) console.warn('get_invite_code 失敗（請確認已執行最新 supabase_schema.sql）：', r.error.message || r.error);
+    }
+  } catch (e) { console.warn('get_invite_code 例外：', e); }
+  try {
+    var s = await db.collection('mk5_data').doc('secret').get();
+    var c = (s.exists && s.data() && s.data().inviteCode) || '';
+    if (c) D._inviteCode = c;
+    return c;
+  } catch (e) { return ''; }
+}
+
+// 新帳號申請：寄「歡迎 + 邀請碼」信給申請人（to_email = 申請人本人）。
+// 申請人登入後（待審核）即可自動收到專屬邀請碼，輸入後立即成為一般編輯。
+async function sendApplicationEmail(user) {
+  try {
+    var cfg = _getEmailjsCfg();
+    if (typeof emailjs === 'undefined' || !cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
+      console.log('EmailJS 尚未設定，略過寄送通知');
+      return;
+    }
+    // 🔑 關鍵修正：先把邀請碼「真的拿到手」，拿不到就不寄、也不設旗標。
+    //   舊版是「先設旗標、再抓邀請碼」——一旦第一次抓不到（例如 get_invite_code 函式
+    //   尚未部署、或剛登入 session 還沒就緒），就會寄出一封「邀請碼空白」的歡迎信，
+    //   而且旗標已設 → 同一個 session 之後永遠不再補寄 → 這就是「設定都對、信卻空白」的根因。
+    var inviteCode = await fetchInviteCode(); // 取得邀請碼（待審核申請者也能透過 get_invite_code 取得）
+    if (!inviteCode) {
+      console.warn('❗ 取不到邀請碼，暫不寄出歡迎信（避免寄出空白邀請碼）。' +
+        '請確認：①已在 Supabase 執行最新 supabase_schema.sql（內含 get_invite_code 函式）；' +
+        '②後台設定已填入 6 位邀請碼。修好後重新整理會自動補寄。');
+      return; // 不設旗標 → 邀請碼補齊後，下次登入／重新整理會自動補寄正確的信
+    }
+
+    // 🔒 防重複：確定能寄出「含邀請碼」的信之後，才設定旗標。
+    //   Supabase 的 onAuthStateChange 會連續觸發多次（INITIAL_SESSION / SIGNED_IN /
+    //   TOKEN_REFRESHED…），旗標可避免在第一封還沒送完前重複寄出（一次寄好幾封）。
+    var flagKey = 'mk5_applied_' + (user.uid || user.email || '');
+    if (sessionStorage.getItem(flagKey)) return;
+    sessionStorage.setItem(flagKey, '1');
+
+    emailjs.send(cfg.serviceId, cfg.templateId, {
+      to_email:   user.email || '',                       // 收件者＝申請人本人
+      user_name:  user.displayName || '(未提供名稱)',
+      user_email: user.email || '',
+      site_name:  (D && D.brandName) || 'MARK NO.5',
+      site_url:   location.origin,
+      invite_code: inviteCode                             // ✅ 自動帶入邀請碼，不再空白
+    }, { publicKey: cfg.publicKey })
+      .then(function() { console.log('📧 已寄出歡迎信（含邀請碼）給', user.email); })
+      .catch(function(err) {
+        // 寄送失敗 → 清掉旗標，讓下次還能重試
+        sessionStorage.removeItem(flagKey);
+        console.warn('EmailJS 歡迎信寄送失敗：', err && (err.text || err.message || err));
+      });
+  } catch(e) { console.warn('sendApplicationEmail 例外：', e); }
+}
+
+// 邀請碼寄送：管理員核准後，將邀請碼寄給被核准的使用者
+// ✅ 此函式在管理員（super_admin）核准 session 呼叫
+// 回傳 Promise<boolean>：true = 已成功寄出含邀請碼的信；false = 未寄出（已自行提示原因）
+async function sendInviteEmail(toEmail, userName) {
+  var cfg = _getEmailjsCfg();
+  if (typeof emailjs === 'undefined' || !cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
+    console.log('EmailJS 尚未設定，略過寄送邀請碼');
+    if (typeof Swal !== 'undefined') {
+      await Swal.fire({
+        title: '⚠ 尚未設定 EmailJS',
+        html: '帳號已核准，但 <b>EmailJS 尚未設定</b>，所以沒有自動寄出邀請信。<br>請到 <b>⚙️ 後台設定 → 帳號審核</b> 填入 EmailJS 的 SERVICE / TEMPLATE / PUBLIC KEY。',
+        icon: 'warning', confirmButtonText: '我知道了'
       });
     }
     return false;
   }
 
-  // ── 防並發鎖定 ──────────────────────────────────────────
-  if (_cloudPushRunning) {
-    // 若已有推送進行中，標記 pending 並直接返回；
-    // 本次推送完成後會自動補推一次
-    _cloudPushPending = true;
-    console.log('☁️ 已有同步進行中，稍後補推');
+  // 取得邀請碼（與歡迎信同一來源：記憶體 → get_invite_code() → 直接讀 secret）
+  var inviteCode = await fetchInviteCode();
+
+  // ❗ 沒有邀請碼就「不要寄出空白邀請碼的信」，改清楚提醒管理員先設定
+  if (!inviteCode) {
+    console.warn('❗ 尚未設定邀請碼，未寄送邀請信');
+    if (typeof Swal !== 'undefined') {
+      await Swal.fire({
+        title: '⚠ 尚未設定邀請碼',
+        html: '帳號已核准，但 <b>邀請碼尚未設定</b>，所以沒有寄出邀請信（避免寄出空白邀請碼）。<br>請到 <b>⚙️ 後台設定 → 帳號審核</b> 填入 6 位邀請碼後，再請對方索取。',
+        icon: 'warning', confirmButtonText: '我知道了'
+      });
+    }
     return false;
   }
-  _cloudPushRunning = true;
-  _cloudPushPending = false;
 
-  var branch  = CLOUD.branch || 'main';
-  var apiUrl  = 'https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js';
-  var headers = {
-    'Authorization': 'Bearer ' + CLOUD.token,
-    'Accept': 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json'
-  };
-
-  showSyncStatus('☁️ 同步中…', 'syncing');
-
-  var MAX_RETRIES = 3;
-  var lastError   = null;
-
-  for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // ── 步驟 1：取得目前檔案 SHA ──────────────────────
-      var sha = null;
-      var shaRes = await fetchWithTimeout(apiUrl + '?ref=' + branch, { headers: headers }, 15000);
-
-      if (shaRes.ok) {
-        var shaData = await shaRes.json();
-        sha = shaData.sha;
-        console.log('☁️ SHA（第 ' + attempt + ' 次）：' + sha);
-      } else if (shaRes.status === 404) {
-        sha = null; // content.js 不存在，首次建立
-      } else if (shaRes.status === 401) {
-        throw new Error('EAUTH:Token 驗證失敗（401），請重新輸入正確的 GitHub Token。');
-      } else if (shaRes.status === 403) {
-        throw new Error('EPERM:Token 權限不足（403），請確認已勾選「Contents: Read and Write」。');
-      } else if (shaRes.status === 404) {
-        throw new Error('ENOREPO:找不到儲存庫，請確認用戶名稱與儲存庫名稱是否正確。');
-      } else if (shaRes.status === 429) {
-        // GitHub API 請求頻率限制
-        var retryAfter = parseInt(shaRes.headers.get('Retry-After') || '30', 10);
-        if (attempt < MAX_RETRIES) {
-          console.log('☁️ 請求頻率限制（429），等待 ' + retryAfter + ' 秒後重試');
-          await cloudSleep(Math.min(retryAfter * 1000, 30000));
-          continue;
-        }
-        throw new Error('請求頻率過高（429），請稍後再試。');
-      } else if (shaRes.status >= 500) {
-        // GitHub 伺服器錯誤，稍後重試
-        if (attempt < MAX_RETRIES) {
-          console.log('☁️ GitHub 伺服器錯誤（' + shaRes.status + '），' + (attempt * 2) + ' 秒後重試');
-          await cloudSleep(attempt * 2000);
-          continue;
-        }
-        throw new Error('GitHub 伺服器錯誤（HTTP ' + shaRes.status + '），請稍後再試。');
-      } else {
-        throw new Error('無法取得檔案資訊（HTTP ' + shaRes.status + '）');
-      }
-
-      // ── 步驟 2：產生 content.js 內容 ──────────────────
-      var pub      = buildPublishData();
-      var date     = new Date().toLocaleString('zh-TW');
-      var jsContent =
-        '/* ================================================================\n' +
-        '   MK5 - Published Content (content.js)\n' +
-        '   Published: ' + date + '\n' +
-        '   Auto-generated. Do not edit manually.\n' +
-        '================================================================ */\n\n' +
-        'window.MK5_PUBLISHED = ' + JSON.stringify(pub, null, 2) + ';\n';
-
-      // ── 步驟 3：Base64 編碼（支援 UTF-8 中文） ─────────
-      var encoded = btoa(unescape(encodeURIComponent(jsContent)));
-
-      // ── 步驟 4：PUT 上傳 ─────────────────────────────
-      var body = {
-        message: 'chore: auto-sync content ' + new Date().toISOString(),
-        content: encoded,
-        branch: branch
-      };
-      if (sha) body.sha = sha;
-
-      console.log('☁️ PUT（第 ' + attempt + ' 次）→ sha:', sha || '(新建)');
-      var res = await fetchWithTimeout(apiUrl, {
-        method: 'PUT', headers: headers, body: JSON.stringify(body)
-      }, 25000);
-
-      if (!res.ok) {
-        var errData = {};
-        try { errData = await res.json(); } catch(ee) {}
-        console.warn('☁️ PUT 回應 ' + res.status + '：', errData);
-
-        if (res.status === 401) throw new Error('EAUTH:Token 驗證失敗，請確認 Token 是否正確或已過期。');
-        if (res.status === 403) throw new Error('EPERM:Token 無寫入權限，請確認已勾選「Contents: Read and Write」。');
-        if (res.status === 404) throw new Error('ENOREPO:找不到儲存庫或 Token 未授權此 Repo。\n請確認：①用戶名稱、儲存庫名稱是否正確 ②建立 Token 時是否有選取此儲存庫 ③是否勾選「Contents: Read and Write」');
-        if (res.status === 409) {
-          // SHA 衝突（並發寫入或 SHA 已過期）→ 重新取得 SHA 並立刻重試
-          if (attempt < MAX_RETRIES) {
-            console.log('☁️ SHA 衝突（409），重新取得 SHA 並重試（第 ' + attempt + ' 次）');
-            await cloudSleep(400);
-            continue;
-          }
-          throw new Error('多次 SHA 衝突，可能有其他裝置同時更新。請再次點擊「💾 儲存」。');
-        }
-        if (res.status === 422) throw new Error('內容格式錯誤（422）：' + (errData.message || ''));
-        if (res.status === 429) {
-          if (attempt < MAX_RETRIES) { await cloudSleep(30000); continue; }
-          throw new Error('請求頻率過高（429），請稍後再試。');
-        }
-        if (res.status >= 500) {
-          if (attempt < MAX_RETRIES) { await cloudSleep(attempt * 2000); continue; }
-        }
-        throw new Error((errData.message || '未知錯誤') + '（HTTP ' + res.status + '）');
-      }
-
-      // ── 步驟 5：成功，更新本地時間戳 ─────────────────
-      D._publishedAt = pub._publishedAt;
-      window.MK5_PUBLISHED = pub;
-      PUBLISHED_AT = pub._publishedAt;
-      persist();
-
-      showSyncStatus('☁️ 已同步 ✓', 'success');
-      console.log('☁️ 同步成功（第 ' + attempt + ' 次嘗試）！時間：', pub._publishedAt);
-      _cloudPushRunning = false;
-
-      // 若同步期間有新的儲存請求（pending），800ms 後補推一次
-      if (_cloudPushPending) {
-        _cloudPushPending = false;
-        console.log('☁️ 執行 pending 補推…');
-        setTimeout(function() { cloudPush(true); }, 800);
-      }
-
-      if (!silent) {
-        Swal.fire({
-          title: '☁️ 同步成功！',
-          html: '內容已自動上傳到 GitHub<br><small style="color:var(--t3)">手機重新整理即可看到最新內容 ✅</small>',
-          icon: 'success', timer: 2500, showConfirmButton: false
-        });
-      }
-      return true;
-
-    } catch(e) {
-      lastError = e;
-      var msg = e.message || '';
-      // 永久性錯誤（憑證問題、設定錯誤）→ 不重試
-      if (msg.startsWith('EAUTH:') || msg.startsWith('EPERM:') || msg.startsWith('ENOREPO:')) {
-        break;
-      }
-      if (attempt < MAX_RETRIES) {
-        console.warn('☁️ 第 ' + attempt + ' 次失敗，' + (attempt * 1500) + 'ms 後重試：', msg);
-        await cloudSleep(attempt * 1500);
-      }
+  try {
+    await emailjs.send(cfg.serviceId, cfg.templateId, {
+      to_email:   toEmail,                       // ✅ EmailJS 模板「To Email」需設為 {{to_email}}，收件者才會是被核准者
+      user_name:  userName || toEmail.split('@')[0],
+      user_email: toEmail,
+      site_name:  (D && D.brandName) || 'MARK NO.5',
+      site_url:   location.origin,
+      invite_code: inviteCode                    // ✅ 正確傳入邀請碼
+    }, { publicKey: cfg.publicKey });
+    console.log('📧 邀請碼已寄出至', toEmail);
+    return true;
+  } catch (err) {
+    console.warn('EmailJS 邀請碼寄送失敗：', err && (err.text || err.message || err));
+    if (typeof Swal !== 'undefined') {
+      await Swal.fire({
+        title: '邀請信寄送失敗',
+        text: (err && (err.text || err.message)) || String(err),
+        icon: 'error', confirmButtonText: '我知道了'
+      });
     }
-  } // end retry loop
-
-  // ── 所有重試均失敗 ──────────────────────────────────
-  _cloudPushRunning = false;
-  _cloudPushPending = false;
-  console.error('☁️ cloudPush 最終失敗：', lastError && lastError.message);
-  showSyncStatus('⚠️ 同步失敗', 'error');
-
-  if (!silent) {
-    var errMsg  = (lastError && lastError.message) || '未知錯誤';
-    var errHint = '';
-    if (errMsg.startsWith('EAUTH:'))    { errMsg = errMsg.slice(6);  errHint = '請至後台設定重新輸入正確的 GitHub Token。'; }
-    else if (errMsg.startsWith('EPERM:'))   { errMsg = errMsg.slice(6);  errHint = '請重新建立 Token，在「Repository permissions」將「Contents」設為「Read and Write」。'; }
-    else if (errMsg.startsWith('ENOREPO:')) { errMsg = errMsg.slice(8); }
-    else if (errMsg.startsWith('ETIMEOUT:')){ errMsg = errMsg.slice(9); errHint = '請確認網路連線正常，或稍後再試。'; }
-    else { errHint = '請至後台設定確認 GitHub Token、用戶名稱、儲存庫名稱是否正確。'; }
-
-    Swal.fire({
-      title: '☁️ 同步失敗',
-      html: '<div style="text-align:left;line-height:1.8;font-size:.88rem">' +
-            '<b style="color:#f87171">' + errMsg.replace(/\n/g, '<br>') + '</b>' +
-            (errHint ? '<br><br><span style="color:var(--t2)">' + errHint + '</span>' : '') +
-            '</div>',
-      icon: 'error',
-      confirmButtonText: '⚙️ 前往設定',
-      showCancelButton: true,
-      cancelButtonText: '關閉'
-    }).then(function(r) { if (r.isConfirmed) openBackendSettings(true); });
+    return false;
   }
-  return false;
 }
 
 /* ============================================================
-   CLOUD PULL（頁面載入時從 GitHub API 拉取最新 content.js）
+   待審核畫面（Google 已登入但尚未核准）
 ============================================================ */
-async function cloudPull() {
-  // 從 content.js 或 CLOUD 設定取得來源資訊
-  var owner  = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudOwner)  || CLOUD.owner;
-  var repo   = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudRepo)   || CLOUD.repo;
-  var branch = (window.MK5_PUBLISHED && window.MK5_PUBLISHED._cloudBranch) || CLOUD.branch || 'main';
+function hidePendingScreen() {
+  var el = document.getElementById('mk5-pending');
+  if (el) el.remove();
+}
 
-  if (!owner || !repo) return; // 尚未設定，跳過
+function showPendingScreen(user) {
+  hidePendingScreen();
+  var ov = document.createElement('div');
+  ov.id = 'mk5-pending';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(9,9,11,.97);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;overflow:auto';
+  var name = (user.displayName || '').toUpperCase();
+  var email = user.email || '';
+  ov.innerHTML =
+    '<button id="mk5-emg-btn" style="width:100%;max-width:560px;background:var(--bg3);border:1px solid var(--border);color:var(--t3);padding:14px;border-radius:12px;cursor:pointer;font-family:var(--serif);font-size:.9rem;text-align:center">⚙ 管理員緊急設定入口（僅開啟後台設定）</button>' +
+    '<div style="width:100%;max-width:560px;background:var(--bg2);border:1px solid var(--border-g);border-radius:16px;padding:30px 26px;text-align:center">' +
+      '<div style="font-size:1.3rem;color:#5b8def;font-weight:700;margin-bottom:16px">🕐 帳號待審核</div>' +
+      '<div style="font-family:var(--display);letter-spacing:.08em;color:var(--t1);font-size:1.1rem">' + (name||'NEW USER') + '</div>' +
+      '<div style="color:var(--t3);font-size:.85rem;margin:4px 0 14px">（' + email + '）</div>' +
+      '<div style="color:var(--t2);font-size:.9rem;line-height:1.9;margin-bottom:22px">您的帳號需要管理者審核後才能使用。<br>系統已通知管理者，請耐心等候，或向管理者索取邀請碼。</div>' +
+      '<div style="font-family:var(--display);letter-spacing:.12em;color:var(--gold);font-size:.8rem;margin-bottom:8px">邀請碼（6 位）</div>' +
+      '<input id="mk5-invite" maxlength="6" inputmode="numeric" placeholder="輸入邀請碼..." style="width:100%;padding:14px;background:var(--bg);border:1px solid var(--border);color:var(--t1);font-size:1.1rem;text-align:center;letter-spacing:.3em;border-radius:10px;outline:none;margin-bottom:14px">' +
+      '<button id="mk5-invite-btn" style="width:100%;padding:15px;background:var(--gold);color:var(--bg);border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:1rem;margin-bottom:10px">🔑 驗證邀請碼</button>' +
+      '<button id="mk5-relogin-btn" style="width:100%;padding:13px;background:var(--bg3);color:var(--t2);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:.92rem">← 返回重新登入</button>' +
+    '</div>';
+  document.body.appendChild(ov);
 
-  // Session 快取（3 分鐘內不重複請求）
-  var cacheKey = 'MK5_PULL_' + owner + '_' + repo + '_' + branch;
+  document.getElementById('mk5-emg-btn').addEventListener('click', emergencyEntry);
+  document.getElementById('mk5-relogin-btn').addEventListener('click', function() { if (auth) auth.signOut(); });
+  var inviteInput = document.getElementById('mk5-invite');
+  var doVerify = function() { verifyInviteCode(user, inviteInput.value.trim()); };
+  document.getElementById('mk5-invite-btn').addEventListener('click', doVerify);
+  inviteInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') doVerify(); });
+}
+
+/* 驗證邀請碼：正確則由 Supabase 安全函式建立 admins 列（role=editor） */
+async function verifyInviteCode(user, code) {
+  if (!code || code.length < 4) { Swal.fire({ title:'請輸入邀請碼', icon:'warning' }); return; }
+  Swal.fire({ title:'驗證中…', didOpen:function(){ Swal.showLoading(); }, allowOutsideClick:false });
   try {
-    var cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      var cObj = JSON.parse(cached);
-      if (Date.now() - (cObj._cachedAt || 0) < 3 * 60 * 1000) {
-        if (cObj._publishedAt && cObj._publishedAt > (D._publishedAt || '')) {
-          window.MK5_PUBLISHED = cObj;
-          PUBLISHED_AT = cObj._publishedAt;
-          mergePublishedContent();
-          updateDOM();
-        }
-        return;
-      }
-    }
-  } catch(e) {}
-
-  var apiUrl  = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/content.js?ref=' + branch;
-  var headers = { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-  if (CLOUD.token) headers['Authorization'] = 'Bearer ' + CLOUD.token;
-
-  try {
-    var res = await fetch(apiUrl, { headers: headers });
-    if (!res.ok) return;
-
-    var data = await res.json();
-    if (!data.content) return;
-
-    // 解碼 base64（GitHub API 回傳有換行符）
-    var decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
-
-    // 從 JS 字串中抽取 JSON 物件
-    var match = decoded.match(/window\.MK5_PUBLISHED\s*=\s*(\{[\s\S]*?\});\s*$/);
-    if (!match) return;
-
-    var remote = JSON.parse(match[1]);
-
-    // 存入 session 快取
-    remote._cachedAt = Date.now();
-    try { sessionStorage.setItem(cacheKey, JSON.stringify(remote)); } catch(e) {}
-
-    // 若遠端版本比本地新，套用並重繪
-    if (remote._publishedAt && remote._publishedAt > (D._publishedAt || '')) {
-      console.log('☁️ 已從 GitHub 同步最新內容（' + remote._publishedAt + '）');
-      window.MK5_PUBLISHED = remote;
-      PUBLISHED_AT = remote._publishedAt;
-      mergePublishedContent();
-      updateDOM();
-    }
-
+    var r = await sb.rpc('redeem_invite', { p_code: code });
+    if (r && r.error) throw r.error;
+    Swal.fire({ title:'✅ 已通過！', text:'歡迎加入，正在進入後台…', icon:'success', timer:1400, showConfirmButton:false });
+    setTimeout(function() { location.reload(); }, 1200);
   } catch(e) {
-    console.log('cloudPull 失敗：', e.message);
+    Swal.fire({ title:'邀請碼錯誤或尚未開放', text:'請確認邀請碼，或聯絡管理者手動核准', icon:'error' });
   }
 }
 
 /* ============================================================
-   SYNC STATUS BAR（管理列同步狀態提示）
+   管理員緊急設定入口（輸入緊急密碼 → 開後台設定）
 ============================================================ */
-function showSyncStatus(msg, type) {
-  var el = document.getElementById('mk5-sync-status');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'mk5-sync-status';
-    el.style.cssText =
-      'position:fixed;bottom:20px;right:20px;padding:10px 20px;border-radius:10px;' +
-      'font-size:.88rem;z-index:2147483647;transition:opacity .6s;pointer-events:none;' +
-      'backdrop-filter:blur(10px);font-weight:600;letter-spacing:.04em;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
-    document.body.appendChild(el);
-  }
-  el.style.opacity = '1';
-  el.textContent = msg;
-  if (type === 'success') {
-    el.style.background  = 'rgba(0,160,80,0.18)';
-    el.style.border      = '1px solid rgba(74,222,128,0.45)';
-    el.style.color       = '#4ade80';
-  } else if (type === 'error') {
-    el.style.background  = 'rgba(181,32,32,0.18)';
-    el.style.border      = '1px solid rgba(248,113,113,0.45)';
-    el.style.color       = '#f87171';
-  } else { // syncing
-    el.style.background  = 'rgba(201,150,58,0.18)';
-    el.style.border      = '1px solid rgba(201,150,58,0.45)';
-    el.style.color       = '#C9963A';
-  }
-  clearTimeout(el._hideTimer);
-  el._hideTimer = setTimeout(function() {
-    el.style.opacity = '0';
-  }, type === 'success' ? 6000 : type === 'error' ? 8000 : 60000);
-}
-
-/* ============================================================
-   TEST CLOUD CONNECTION（測試 GitHub 連線 — 顯示於表單內，不開新 Swal）
-============================================================ */
-window.testCloudConnection = async function() {
-  var ownerEl  = document.getElementById('bs-cloud-owner');
-  var repoEl   = document.getElementById('bs-cloud-repo');
-  var tokenEl  = document.getElementById('bs-cloud-token');
-  var resultEl = document.getElementById('bs-cloud-test-result');
-  if (!resultEl) return;
-
-  // 即時存入 CLOUD（不需等 preConfirm）
-  if (ownerEl)  CLOUD.owner  = ownerEl.value.trim();
-  if (repoEl)   CLOUD.repo   = repoEl.value.trim();
-  if (tokenEl)  CLOUD.token  = tokenEl.value.trim();
-  try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
-
-  // ✅ 用 var 賦值（不用 function 宣告），避免 async 函數內巢狀宣告問題
-  var setResult = function(icon, msg, ok) {
-    resultEl.style.display = 'block';
-    resultEl.style.background = ok === null ? 'rgba(201,150,58,0.12)' :
-                                ok ? 'rgba(0,160,80,0.15)' : 'rgba(181,32,32,0.15)';
-    resultEl.style.border     = ok === null ? '1px solid rgba(201,150,58,0.4)' :
-                                ok ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(248,113,113,0.4)';
-    resultEl.style.color      = ok === null ? '#C9963A' : ok ? '#4ade80' : '#f87171';
-    resultEl.innerHTML        = icon + ' ' + msg;
-  };
-
-  if (!CLOUD.owner || !CLOUD.repo || !CLOUD.token) {
-    setResult('⚠️', '請先填入所有欄位', false);
+async function emergencyEntry() {
+  var bs = (D && D.backendSettings) || {};
+  if (!bs.emergencyHash) {
+    Swal.fire({ title:'尚未設定緊急密碼', text:'請先以超級執行長身分登入，於後台設定緊急密碼後才能使用此入口。', icon:'info' });
     return;
   }
+  var r = await Swal.fire({
+    title:'⚙ 管理員緊急設定', input:'password', inputPlaceholder:'輸入緊急密碼',
+    showCancelButton:true, confirmButtonText:'驗證', cancelButtonText:'取消'
+  });
+  if (!r.isConfirmed) return;
+  var hash = await sha256(r.value || '');
+  if (hash === bs.emergencyHash) {
+    window.__EMERGENCY = true;
+    openBackendSettings();
+  } else {
+    Swal.fire({ title:'密碼錯誤', icon:'error' });
+  }
+}
 
-  setResult('🔄', '測試中…', null);
+/* 超級執行長首次登入引導：EmailJS 尚未設定時，等開場動畫結束後自動開後台設定 */
+// ✅ EmailJS 提示：若使用者選擇「不需要」，永久儲存到 localStorage，不再提示
+var _EMAILJS_SKIP_KEY = 'MK5_EMAILJS_SKIP';
+var _firstSetupPrompted = false;
+function maybePromptFirstSetup() {
+  if (!CU || CU.role !== 'super_admin') return;
+  if (_firstSetupPrompted) return;
+  // 使用者曾選「不需要 EmailJS」→ 永久不提示
+  if (localStorage.getItem(_EMAILJS_SKIP_KEY) === '1') return;
+  var ej = (D.backendSettings && D.backendSettings.emailjs) || {};
+  if (ej.serviceId && ej.templateId && ej.publicKey) return; // 已設定 → 不再提示
+  var tries = 0;
+  var t = setInterval(function() {
+    tries++;
+    var ov = document.getElementById('intro-overlay');
+    var introGone = !ov || ov.style.display === 'none' || (window.getComputedStyle(ov).display === 'none');
+    if (!introGone && tries <= 40) return;
+    clearInterval(t);
+    if (!CU || CU.role !== 'super_admin') return;
+    if (_firstSetupPrompted) return;
+    if (localStorage.getItem(_EMAILJS_SKIP_KEY) === '1') return;
+    var ej2 = (D.backendSettings && D.backendSettings.emailjs) || {};
+    if (ej2.serviceId && ej2.templateId && ej2.publicKey) return;
+    _firstSetupPrompted = true;
+    Swal.fire({
+      title: '👋 EmailJS 申請通知信設定',
+      html: '若需要「有人申請帳號時自動通知你」的功能，請到 <b>後台設定 → 帳號審核</b> 填入 EmailJS 資訊。<br><br>若不需要此功能，點「不需要」即可永久關閉此提示。',
+      icon: 'info',
+      confirmButtonText: '前往設定',
+      showCancelButton: true,
+      cancelButtonText: '不需要 EmailJS',
+      showDenyButton: false
+    }).then(function(r) {
+      if (r.isConfirmed) {
+        openBackendSettings();
+      } else {
+        // 使用者選「不需要」→ 永久記錄，不再提示
+        localStorage.setItem(_EMAILJS_SKIP_KEY, '1');
+      }
+    });
+  }, 300);
+}
 
-  var authHeaders = {
-    'Authorization': 'Bearer ' + CLOUD.token,
-    'Accept': 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28'
-  };
+// 計算字串的位元組大小（中文 UTF-8 為 3 bytes，需用 Blob 精算）
+function byteSize(str) {
+  try { return new Blob([str]).size; } catch(e) { return str.length; }
+}
 
+// 取出「公開內容」副本（排除 analytics / users / editLog，這些另存他處）
+function buildMainData() {
+  var m = JSON.parse(JSON.stringify(D));
+  delete m.analytics;
+  delete m.users;
+  delete m.editLog;
+  delete m.inbox; // 來信已改 mail-only，不再上雲
+  delete m._inviteCode; // 邀請碼機密，存於 mk5_data/secret，絕不進公開 main
+  return m;
+}
+
+// 建立「還原快照」：刻意排除 editLog / users / analytics / inbox / _inviteCode。
+// ⚠ 關鍵修正：以前用 JSON.stringify(D)，而 D.editLog 內每筆又各自存了一份完整快照，
+//   造成「快照包快照」的指數級膨脹（幾次編輯後體積暴增到數十 MB），
+//   寫入 Supabase 時就會出現「NetworkError when attempting to fetch resource」儲存失敗。
+//   還原時（restoreSnap）本來就會用「目前的 editLog / users」覆蓋快照內的同名欄位，
+//   因此把這些欄位排除在快照外完全不影響還原結果，只會讓體積回到正常。
+function buildSnapshot() {
+  var clone = Object.assign({}, D);
+  delete clone.editLog;
+  delete clone.users;
+  delete clone.analytics;
+  delete clone.inbox;
+  delete clone._inviteCode;
+  return JSON.stringify(clone);
+}
+
+// 整理 editLog：限制筆數、丟棄體積過大的舊版巢狀快照，避免寫入時超量導致 NetworkError。
+function sanitizeEditLog(log) {
+  log = (log || []).slice(0, 30); // 最多保留 30 筆紀錄
+  var MAX_SNAP = 300 * 1024;       // 單筆快照上限 300KB（超過＝舊版指數膨脹快照 → 丟棄快照，保留紀錄）
+  for (var i = 0; i < log.length; i++) {
+    var e = log[i];
+    if (!e || !e.snapshot) continue;
+    // 只有最近 10 筆保留快照；其餘或過大者一律移除（紀錄文字仍保留，只是不能「還原」）
+    if (i >= 10 || byteSize(e.snapshot) > MAX_SNAP) delete e.snapshot;
+  }
+  return log;
+}
+
+// 實際寫入（會丟出錯誤，供呼叫端判斷成功/失敗）
+async function persistRaw() {
+  if (!db) throw new Error('Supabase 尚未初始化');
+
+  // ── 公開內容 → mk5_data/main（這是「真正要保住」的網站內容） ──
+  var mainData = buildMainData();
+  var mainStr  = JSON.stringify(mainData);
+  console.log('📤 main 體積：' + (byteSize(mainStr) / 1024).toFixed(1) + ' KB' +
+              '｜emailjs：' + JSON.stringify(mainData.backendSettings && mainData.backendSettings.emailjs));
+
+  // main 寫入失敗才算「儲存失敗」（會往外丟，讓使用者看到）
+  await db.collection('mk5_data').doc('main').set(mainData);
+
+  // ── editLog → mk5_data/private（次要：只是版本紀錄，失敗不該擋住內容儲存） ──
+  // 先整理：限制筆數 + 丟棄過大的舊版巢狀快照，避免 private 文件過大。
   try {
-    // 第一步：確認 Token 有效 + 儲存庫存在（可存取）
-    var repoRes = await fetch('https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo, { headers: authHeaders });
+    var editLog = sanitizeEditLog(JSON.parse(JSON.stringify(D.editLog || [])));
+    D.editLog = editLog; // 記憶體也同步成精簡後版本
+    var pvStr = JSON.stringify({ editLog: editLog });
+    console.log('📤 private(editLog) 體積：' + (byteSize(pvStr) / 1024).toFixed(1) + ' KB｜' + editLog.length + ' 筆');
+    await db.collection('mk5_data').doc('private').set({ editLog: editLog });
+  } catch (e) {
+    // ⚠ editLog 寫入失敗（例如歷史紀錄過大）→ 只記錄、不中斷，主要內容已存成功
+    console.warn('editLog（private）寫入失敗，已略過，不影響主要內容：', e && (e.message || e));
+  }
 
-    if (repoRes.status === 401) {
-      setResult('❌', 'Token 無效，請確認 GitHub Token 正確且未過期。', false);
-      return;
-    }
-    if (repoRes.status === 403) {
-      setResult('❌', 'Token 權限不足，請確認 Token 已勾選「Contents: Read and Write」。', false);
-      return;
-    }
-    if (repoRes.status === 404) {
-      setResult('❌',
-        '找不到儲存庫「' + CLOUD.owner + '/' + CLOUD.repo + '」<br>' +
-        '請確認以下事項：<br>' +
-        '① 用戶名稱與儲存庫名稱拼寫是否正確<br>' +
-        '② Fine-grained Token 建立時「Repository access」是否已選取此儲存庫<br>' +
-        '③ 需選「Only select repositories」並手動加入此 Repo',
-        false);
-      return;
-    }
-    if (!repoRes.ok) {
-      setResult('❌', '無法連接到儲存庫（HTTP ' + repoRes.status + '）', false);
-      return;
-    }
+  console.log('✅ 主要內容已同步至 Supabase 雲端');
+}
 
-    // 第二步：確認 content.js 是否存在
-    var fileRes = await fetch('https://api.github.com/repos/' + CLOUD.owner + '/' + CLOUD.repo + '/contents/content.js', { headers: authHeaders });
-
-    if (fileRes.ok) {
-      setResult('✅', '連線成功！已找到 content.js，可以正常同步 🎉', true);
-    } else if (fileRes.status === 404) {
-      setResult('✅', '連線成功！儲存庫已連通，首次點擊「💾 儲存」時會自動建立 content.js 🎉', true);
-    } else {
-      setResult('⚠️', '儲存庫連通，但讀取 content.js 時發生問題（HTTP ' + fileRes.status + '）', false);
-    }
+// 儲存：公開內容寫 main、editLog 寫 private。皆需管理員（Supabase RLS）。
+// 註：管理員 profile（users）改存 admins 集合，由 saveAdmin() 個別寫入，不在這裡。
+// silent = true 時（自動儲存）失敗只記 console，不彈出錯誤視窗，避免一直跳出干擾。
+async function persist(silent) {
+  try {
+    await persistRaw();
+    return true;
   } catch(e) {
-    setResult('❌', '網路錯誤：' + (e.message || '無法連接到 GitHub'), false);
+    var msg = (e && (e.message || e.error_description || e.code)) || '雲端寫入失敗';
+    console.error('雲端儲存失敗:', e);
+    if (CU && !silent) {
+      Swal.fire({
+        title: '儲存失敗',
+        html: '<b style="color:#f87171">' + String(msg) + '</b><br><br>' +
+              '<small style="color:var(--t2);line-height:1.8">' +
+              '請按 <b>F12 → Console</b> 看上方的「main 體積」與紅色錯誤。<br>常見原因：<br>' +
+              '1. 內容過大（例如夾帶 base64 圖片）<br>' +
+              '2. Supabase 連線/專案被暫停<br>' +
+              '3. 帳號未核准或 RLS 阻擋' +
+              '</small>',
+        icon: 'error', confirmButtonText: '確認'
+      });
+    }
+    return false;
   }
-};
+}
 
-function persist() {
+/* 訪客瀏覽統計：寫入獨立的公開文件 mk5_data/analytics（不會動到內容/帳號） */
+async function persistAnalytics() {
   try {
-    // 建立一個副本用於儲存，避免修改原始資料
-    var dataToSave = JSON.parse(JSON.stringify(D));
-    
-    // 限制 editLog 最多保留 50 筆（原本 100 筆太多）
-    if (dataToSave.editLog && dataToSave.editLog.length > 50) {
-      dataToSave.editLog = dataToSave.editLog.slice(0, 50);
-      D.editLog = dataToSave.editLog; // 同步更新原始資料
+    if (!db) return;
+    // 清理 90 天前的逐日資料，避免無限成長
+    if (D.analytics && D.analytics.byDate) {
+      var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
+      var cutoffStr = cutoff.toISOString().split('T')[0];
+      var cleaned = {};
+      for (var date in D.analytics.byDate) if (date >= cutoffStr) cleaned[date] = D.analytics.byDate[date];
+      D.analytics.byDate = cleaned;
     }
-    
-    // 限制 inbox 最多保留 100 筆
-    if (dataToSave.inbox && dataToSave.inbox.length > 100) {
-      dataToSave.inbox = dataToSave.inbox.slice(0, 100);
-      D.inbox = dataToSave.inbox;
-    }
-    
-    // 清理 analytics 中過舊的資料（只保留最近 90 天）
-    if (dataToSave.analytics && dataToSave.analytics.byDate) {
-      var cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90);
-      var cutoffStr = cutoffDate.toISOString().split('T')[0];
-      
-      var cleanedByDate = {};
-      for (var date in dataToSave.analytics.byDate) {
-        if (date >= cutoffStr) {
-          cleanedByDate[date] = dataToSave.analytics.byDate[date];
-        }
-      }
-      dataToSave.analytics.byDate = cleanedByDate;
-      D.analytics.byDate = cleanedByDate;
-    }
-    
-    localStorage.setItem(KEY, JSON.stringify(dataToSave));
-  }
-  catch(e) { 
-    if (e.name === 'QuotaExceededError') {
-      console.log('儲存空間不足，開始清理...');
-      
-      // 第一次清理：減少 editLog 和 inbox
-      D.editLog = D.editLog ? D.editLog.slice(0, 20) : [];
-      D.inbox = D.inbox ? D.inbox.slice(0, 50) : [];
-      if (D.analytics) D.analytics.byDate = {};
-      
-      try {
-        localStorage.setItem(KEY, JSON.stringify(D));
-        console.log('清理後儲存成功');
-        return; // 儲存成功，直接返回
-      } catch(e2) {
-        console.log('第一次清理後仍失敗，進行深度清理...');
-        
-        // 第二次清理：更激進
-        D.editLog = [];
-        D.inbox = [];
-        if (D.analytics) {
-          D.analytics.byDate = {};
-          D.analytics.byDevice = {};
-          D.analytics.bySource = {};
-        }
-        
-        try {
-          localStorage.setItem(KEY, JSON.stringify(D));
-          console.log('深度清理後儲存成功');
-          Swal.fire({ 
-            title:'✅ 已儲存', 
-            html:'系統已清理舊資料以騰出空間',
-            timer: 2000,
-            icon:'success'
-          });
-          return;
-        } catch(e3) {
-          console.error('深度清理後仍失敗:', e3);
-          Swal.fire({ 
-            title:'儲存失敗', 
-            html:'資料量過大無法儲存。<br>建議：<br>1. 減少作品集數量<br>2. 清除瀏覽器快取後重試', 
-            icon:'error' 
-          });
-        }
-      }
-    } else {
-      console.error('persist 發生其他錯誤:', e);
-      Swal.fire({ title:'儲存錯誤', text: e.message, icon:'error' });
-    }
-  }
+    await db.collection('mk5_data').doc('analytics').set(D.analytics || {});
+  } catch(e) { console.log('analytics 寫入失敗:', e.message); }
+}
+
+/* 記錄編輯紀錄（含可還原快照）；未登入（含緊急入口）時略過 */
+function logEdit(keys) {
+  if (!CU) return;
+  if (!D.editLog) D.editLog = [];
+  D.editLog.unshift({
+    user: CU.name, email: CU.email, role: CU.role,
+    date: new Date().toLocaleString('zh-TW'),
+    keys: keys || [], snapshot: buildSnapshot()
+  });
+  if (D.editLog.length > 30) D.editLog = D.editLog.slice(0, 30);
 }
 
 /* ============================================================
@@ -1345,24 +1432,7 @@ function bindEvents() {
     var needsStr = needsArr.length ? '\n\n專案需求：' + needsArr.join('、') : '';
     var timeStr = timeArr.length ? '\n可聯繫時間：' + timeArr.join('、') : '';
     var phoneStr = ph ? '\n電話：' + ph : '';
-    // Save to inbox
-    if (!D.inbox) D.inbox = [];
-    D.inbox.unshift({ 
-      date: new Date().toLocaleString('zh-TW'), 
-      time: new Date().toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-      name: nm, 
-      email: em, 
-      phone: ph, 
-      subject: '影像合作詢問',
-      msg: mg, 
-      needs: needsArr, 
-      times: timeArr, 
-      replied: false,
-      read: false // 新訊息標記為未讀
-    });
-    if (D.inbox.length > 200) D.inbox = D.inbox.slice(0, 200);
-    persist();
-    updateInboxBadge(); // 更新徽章
+    // 來信改為僅寄信件（mailto），不再寫入雲端
     var toAddr = D.mailToAddress || D.contactEmail;
     var sub = encodeURIComponent('【影像合作詢問】來自 ' + nm);
     var bod = encodeURIComponent('姓名：' + nm + '\n信箱：' + em + phoneStr + needsStr + timeStr + '\n\n補充說明：\n' + mg);
@@ -1583,7 +1653,7 @@ function renderFooterCopy() {
 /* ============================================================
    SAVE
 ============================================================ */
-window.saveChanges = function(showAlert) {
+window.saveChanges = async function(showAlert) {
   if (showAlert === undefined) showAlert = true;
   var changed = [];
   var els = document.querySelectorAll('[data-key]');
@@ -1597,16 +1667,14 @@ window.saveChanges = function(showAlert) {
     if (String(old) !== String(v)) changed.push(k);
   }
   if (CU && changed.length) {
-    D.editLog.unshift({ user:CU.name, username:CU.username, role:CU.role, date:new Date().toLocaleString('zh-TW'), keys:changed, snapshot:JSON.stringify(D) });
-    if (D.editLog.length > 100) D.editLog = D.editLog.slice(0, 100);
+    D.editLog.unshift({ user:CU.name, email:CU.email, role:CU.role, date:new Date().toLocaleString('zh-TW'), keys:changed, snapshot:buildSnapshot() });
+    if (D.editLog.length > 30) D.editLog = D.editLog.slice(0, 30);
   }
-  persist(); updateDOM();
-  if (showAlert) Swal.fire({ title:'✓ 儲存成功', timer:1200, showConfirmButton:false, icon:'success' });
-  // ☁️ 自動同步到 GitHub（靜默，防抖 800ms：連續快速儲存只觸發一次推送）
-  if (CU && CLOUD.token && CLOUD.owner && CLOUD.repo) {
-    clearTimeout(_cloudPushDebounce);
-    _cloudPushDebounce = setTimeout(function() { cloudPush(true); }, 800);
-  }
+  // showAlert=true（手動 💾）→ 失敗會彈窗；showAlert=false（自動儲存）→ 靜默，不干擾
+  var ok = await persist(!showAlert);
+  updateDOM();
+  // 只有「真的存成功」才顯示儲存成功（以前不論成敗都顯示，會與錯誤視窗一起跳出）
+  if (showAlert && ok) Swal.fire({ title:'✓ 儲存成功', timer:1200, showConfirmButton:false, icon:'success' });
 };
 
 /* ============================================================
@@ -2434,10 +2502,14 @@ window.manageCarousel = function() {
             var img = new Image();
             img.onload = function() {
               var cv = document.createElement('canvas');
-              var mW = 1200, sc = Math.min(1, mW / img.width);
+              var mW = 1280, sc = Math.min(1, mW / img.width);
               cv.width = img.width * sc; cv.height = img.height * sc;
               cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-              res(cv.toDataURL('image/jpeg', 0.82));
+              // 壓縮後上傳到 Supabase Storage，資料庫只存回傳的網址
+              canvasToBlob(cv, 'image/jpeg', 0.72)
+                .then(function(blob) { return uploadToStorage(blob, 'carousel', 'jpg'); })
+                .then(function(url) { res(url); })
+                .catch(function(err) { Swal.showValidationMessage('圖片上傳失敗：' + (err.message || err)); res(false); });
             };
             img.src = e.target.result;
           };
@@ -2575,7 +2647,7 @@ window.editServiceDescriptions = function() {
           }
           
           if (iconFile) {
-            // 有上傳新圖示
+            // 有上傳新圖示 → 縮圖後上傳 Storage，只保存網址（上傳失敗則沿用舊圖）
             var promise = new Promise(function(resolve) {
               var reader = new FileReader();
               reader.onload = function(e) {
@@ -2586,12 +2658,15 @@ window.editServiceDescriptions = function() {
                   canvas.width = canvas.height = size;
                   var ctx = canvas.getContext('2d');
                   ctx.drawImage(img, 0, 0, size, size);
-                  resolve({
-                    cat: cat,
-                    description: descEl.value.trim() || ('專業' + cat + '製作服務'),
-                    show: showEl.checked,
-                    icon: canvas.toDataURL('image/png', 0.9)
-                  });
+                  canvasToBlob(canvas, 'image/png', 0.9)
+                    .then(function(blob) { return uploadToStorage(blob, 'service-icons', 'png'); })
+                    .then(function(url) {
+                      resolve({ cat: cat, description: descEl.value.trim() || ('專業' + cat + '製作服務'), show: showEl.checked, icon: url });
+                    })
+                    .catch(function(err) {
+                      console.warn('服務圖示上傳失敗，沿用舊圖：', err.message || err);
+                      resolve({ cat: cat, description: descEl.value.trim() || ('專業' + cat + '製作服務'), show: showEl.checked, icon: oldIcon });
+                    });
                 };
                 img.src = e.target.result;
               };
@@ -2645,51 +2720,60 @@ window.editServiceDescriptions = function() {
 window.changeLogo = function() {
   Swal.fire({
     title: '🔄 更換 Logo',
-    html: '<input type="file" id="lf" class="swal2-file" accept="image/*,video/mp4,video/quicktime">' +
-          '<p style="margin-top:8px;font-size:.78rem;color:var(--t3)">支援圖片（PNG/JPG）或影片（MP4/MOV）</p>' +
-          '<p style="font-size:.78rem;color:var(--t3)">圖片建議方形，解析度 800x800 以上</p>',
-    confirmButtonText: '上傳', showCancelButton: true,
+    html: '<input type="file" id="lf" class="swal2-file" accept="image/*,video/*">' +
+          '<p style="margin-top:8px;font-size:.78rem;color:var(--t3)">圖片建議方形 800x800 以上（PNG/JPG）；也可上傳影片 Logo（MP4/WebM）。</p>' +
+          '<p style="font-size:.72rem;color:var(--t3)">（檔案會上傳到 Supabase Storage，資料庫只保存網址）</p>',
+    confirmButtonText: '上傳', showCancelButton: true, showLoaderOnConfirm: true,
+    allowOutsideClick: function(){ return !Swal.isLoading(); },
     preConfirm: function() {
-      var file = document.getElementById('lf').files[0]; 
-      if (!file) return null;
-      
-      // 檢查是否為影片
+      var file = document.getElementById('lf').files[0];
+      if (!file) { Swal.showValidationMessage('請選擇檔案'); return false; }
+
+      // 影片 Logo：直接上傳到 Supabase Storage（不壓縮），資料庫只存網址
       if (file.type.startsWith('video/')) {
-        return new Promise(function(res) {
-          var rdr = new FileReader();
-          rdr.onload = function(e) {
-            res({ type: 'video', data: e.target.result });
-          };
-          rdr.readAsDataURL(file);
-        });
+        var vext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+        if (['mp4','webm','mov','m4v'].indexOf(vext) === -1) vext = 'mp4';
+        return uploadToStorage(file, 'logo', vext)
+          .then(function(url) { return { type: 'video', data: url }; })
+          .catch(function(err) { Swal.showValidationMessage('影片 Logo 上傳失敗：' + (err.message || err)); return false; });
       }
-      
-      // 圖片處理 - 提高解析度到 800x800
+
+      if (!file.type.startsWith('image/')) {
+        Swal.showValidationMessage('請選擇圖片或影片檔'); return false;
+      }
+
+      // 圖片：縮放至 800x800 後上傳到 Supabase Storage
       return new Promise(function(res) {
         var rdr = new FileReader();
         rdr.onload = function(e) {
           var img = new Image();
           img.onload = function() {
-            var cv = document.createElement('canvas'); 
-            cv.width = cv.height = 800; // 提高解析度
+            var cv = document.createElement('canvas');
+            cv.width = cv.height = 800; // 高解析度（顯示僅 38px / 開場 300px，800px 綽綽有餘）
             var s = Math.min(img.width, img.height);
             var ctx = cv.getContext('2d');
+            // 圓形裁切後背景填黑，確保 JPEG（無透明）在深色介面下自然
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 800, 800);
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 800, 800);
-            res({ type: 'image', data: cv.toDataURL('image/png', 0.95) }); // 使用 PNG 和更高品質
+            canvasToBlob(cv, 'image/jpeg', 0.9)
+              .then(function(blob) { return uploadToStorage(blob, 'logo', 'jpg'); })
+              .then(function(url) { res({ type: 'image', data: url }); })
+              .catch(function(err) { Swal.showValidationMessage('Logo 上傳失敗：' + (err.message || err)); res(false); });
           };
           img.src = e.target.result;
         };
         rdr.readAsDataURL(file);
       });
     }
-  }).then(function(r) { 
-    if (r.value) { 
+  }).then(function(r) {
+    if (r.value && r.value.data) {
       D.logoData = r.value.data;
       D.logoType = r.value.type; // 記錄類型
-      saveChanges(false); 
-    } 
+      saveChanges(false);
+    }
   });
 };
 
@@ -2796,8 +2880,8 @@ function updateAdminUI() {
       roleBadge = '<span style="background:linear-gradient(135deg,#9A948C,#B8B2A8);color:#fff;font-size:.62rem;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600">優秀人員</span>';
     }
     
-    // 顯示帳號，靠近大頭貼
-    document.getElementById('admin-info').innerHTML = '<strong>' + CU.username + '</strong>' + roleBadge;
+    // 顯示名稱，靠近大頭貼
+    document.getElementById('admin-info').innerHTML = '<strong>' + (CU.name || CU.email || '') + '</strong>' + roleBadge;
     
     // 右邊顯示大頭貼
     if (CU.avatar && avatarDiv && avatarImg) {
@@ -2840,45 +2924,25 @@ function updateAdminUI() {
 }
 
 window.showLoginModal = function() {
+  if (!auth || !sb) { Swal.fire({ title:'Supabase Auth 尚未初始化', text:'請確認 app.js 已填入 Supabase 金鑰。', icon:'error' }); return; }
   Swal.fire({
     title: '後台登入',
-    html: '<input id="su" class="swal2-input" placeholder="帳號" autocomplete="username"><input id="sp" type="password" class="swal2-input" placeholder="密碼" autocomplete="current-password">',
-    confirmButtonText: '登入', showCancelButton: true, cancelButtonText: '取消',
-    didOpen: function() {
-      // 監聽 ENTER 鍵
-      var passwordInput = document.getElementById('sp');
-      var usernameInput = document.getElementById('su');
-      
-      var handleEnter = function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          Swal.clickConfirm();
-        }
-      };
-      
-      usernameInput.addEventListener('keypress', handleEnter);
-      passwordInput.addEventListener('keypress', handleEnter);
-      
-      // 自動 focus 到帳號欄位
-      usernameInput.focus();
-    },
-    preConfirm: function() { return { u: document.getElementById('su').value, p: document.getElementById('sp').value }; }
-  }).then(function(r) {
-    if (r.isConfirmed) {
-      var found = null;
-      for (var i = 0; i < D.users.length; i++) {
-        if (D.users[i].username === r.value.u && D.users[i].password === r.value.p) { found = D.users[i]; break; }
-      }
-      if (found) {
-        CU = found;
-        var ui = -1; for (var i = 0; i < D.users.length; i++) if (D.users[i].username === CU.username) { ui = i; break; }
-        if (ui >= 0) { D.users[ui].online = true; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
-        sessionStorage.setItem('mk5cu', JSON.stringify(CU)); persist(); updateDOM();
-        startAutoLogout(); startAutoSave(); // 啟動自動登出計時器
-        Swal.fire({ title: '歡迎，' + found.name + '！', timer: 1200, showConfirmButton: false, icon: 'success' });
-      } else Swal.fire({ title: '帳號或密碼錯誤', icon: 'error' });
+    html: '<p style="color:var(--t2);font-size:.9rem;line-height:1.8;margin-bottom:6px">請使用 Google 帳號登入。<br>新帳號需經管理者核准或輸入邀請碼。</p>',
+    showCancelButton: true,
+    confirmButtonText: '<i class="fab fa-google"></i> 使用 Google 登入',
+    cancelButtonText: '取消',
+    showLoaderOnConfirm: true,
+    preConfirm: function() {
+      // Supabase Google OAuth：會整頁轉址到 Google，登入後自動導回本站並建立 session
+      return auth.signInWithGoogle()
+        .then(function() { return true; })
+        .catch(function(err) {
+          Swal.showValidationMessage('登入失敗：' + (err && (err.message || err)));
+          return false;
+        });
     }
   });
+  // 後續由 onAuthStateChanged → handleAuthState 決定 已核准/待審核
 };
 
 /* ============================================================
@@ -2934,7 +2998,7 @@ function startAutoSave() {
   
   autoSaveTimer = setTimeout(function() {
     if (CU) {
-      saveChanges(true); // true 表示自動儲存，不顯示提示
+      saveChanges(false); // false＝自動儲存：成功不提示、失敗也不彈窗（只記 console）
     }
   }, milliseconds);
 }
@@ -2952,24 +3016,34 @@ function clearAutoSave() {
 window.adminLogout = function() {
   clearAutoLogout(); // 登出時清除計時器
   saveChanges(false);
-  if (CU) {
-    var ui = -1; for (var i = 0; i < D.users.length; i++) if (D.users[i].username === CU.username) { ui = i; break; }
-    if (ui >= 0) { D.users[ui].online = false; D.users[ui].lastSeen = new Date().toLocaleString('zh-TW'); }
+  if (CU && CU.uid) {
+    CU.online = false; CU.lastSeen = new Date().toLocaleString('zh-TW');
+    try { saveAdmin(CU); } catch(e) {} // 寫回離線狀態（仍為登入身分，可寫入）
   }
-  CU = null; sessionStorage.removeItem('mk5cu'); persist(); updateDOM();
+  // 由 Supabase Auth 登出；onAuthStateChanged 會把 CU 清為 null 並更新畫面
+  if (auth) auth.signOut();
   Swal.fire({ title: '已登出', timer: 900, showConfirmButton: false });
 };
 
 /* ============================================================
    BACKEND SETTINGS (super_admin only)
 ============================================================ */
-window.openBackendSettings = function(scrollToCloud) {
-  if (!CU) {
+window.openBackendSettings = async function(scrollToCloud) {
+  var EMERGENCY = !!window.__EMERGENCY;   // 緊急入口模式（未登入但已驗證緊急密碼）
+  if (!CU && !EMERGENCY) {
     Swal.fire({title:'無權限',text:'請先登入',icon:'error'});
     return;
   }
   // 所有已登入的人都可以進入後台設定，但只能編輯有權限的項目
-  
+
+  // 開啟設定前，從雲端「真實」回讀邀請碼，避免「記憶體顯示已設定、雲端其實是空的」誤導。
+  if (CU && CU.role === 'super_admin' && db) {
+    try {
+      var _s = await db.collection('mk5_data').doc('secret').get();
+      D._inviteCode = (_s.exists && _s.data() && _s.data().inviteCode) || '';
+    } catch (e) { console.warn('讀取邀請碼狀態失敗：', e); }
+  }
+
   var t = D.theme || {};
   var bs = D.backendSettings || {};
   var social = D.social || {};
@@ -3006,7 +3080,7 @@ window.openBackendSettings = function(scrollToCloud) {
     width: 920,
     html: (function() {
       var h = '<div style="text-align:left;color:var(--t2);font-size:.88rem;max-height:680px;overflow-y:auto;padding:10px">';
-      var isSuperAdmin = CU && CU.role === 'super_admin';
+      var isSuperAdmin = (CU && CU.role === 'super_admin') || EMERGENCY;
       var t = D.theme || {};
       var bs = D.backendSettings || {};
       var social = D.social || {};
@@ -3020,7 +3094,17 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">2. 開場動畫大標題大小：<input id="bs-intro-tagline-size" class="swal2-input" style="margin-top:4px" value="' + (D.introTaglineSize||'') + '" placeholder="1rem"></label>';
       }
       if (isSuperAdmin || canEdit('introLogoSize')) {
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">3. 開場動畫 Logo 大小：<input id="bs-intro-logo-size" class="swal2-input" style="margin-top:4px" value="' + (t.introLogoSize||'') + '" placeholder="300px"></label>';
+        var _logoSizePx = parseInt((t.introLogoSize || '300px')) || 300;
+        h += '<div style="margin-bottom:14px">';
+        h += '<div style="font-size:.85rem;margin-bottom:6px">3. 首頁 Logo 動畫大小（開場動畫 Logo 圓形尺寸）：</div>';
+        h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+        h += '<input id="bs-intro-logo-range" type="range" min="100" max="600" step="10" value="' + _logoSizePx + '" style="flex:1;min-width:160px;accent-color:var(--gold)" oninput="var v=this.value;document.getElementById(\'bs-intro-logo-num\').value=v;document.getElementById(\'bs-intro-logo-size\').value=v+\'px\'">';
+        h += '<input id="bs-intro-logo-num" type="number" min="100" max="600" step="10" value="' + _logoSizePx + '" style="width:72px;padding:4px 8px;background:var(--bg3);border:1px solid var(--border-g);color:var(--t1);border-radius:4px;font-size:.9rem;text-align:center" oninput="var v=this.value;document.getElementById(\'bs-intro-logo-range\').value=v;document.getElementById(\'bs-intro-logo-size\').value=v+\'px\'">';
+        h += '<span style="font-size:.82rem;color:var(--t3)">px</span>';
+        h += '</div>';
+        h += '<input type="hidden" id="bs-intro-logo-size" value="' + _logoSizePx + 'px">';
+        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-top:4px">建議：手機 200px，桌機 300px，最大 600px</small>';
+        h += '</div>';
       }
 
       // ─── 2. 頂端資訊欄 ───
@@ -3038,7 +3122,7 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:10px">目前 Logo：</p>';
         h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
         h += '<img src="' + (D.logoData || '') + '" style="width:60px;height:60px;border-radius:50%;border:2px solid var(--gold)">';
-        h += '<button onclick="changeLogo()" class="swal2-confirm swal2-styled" style="margin:0">上傳新 Logo</button>';
+        h += '<button onclick="changeLogo()" type="button" style="margin:0;padding:9px 22px;background:var(--gold);color:var(--bg);border:none;cursor:pointer;font-size:.85rem;font-weight:700;border-radius:3px">上傳新 Logo</button>';
         h += '</div>';
         h += '<small style="color:var(--t3);font-size:.75rem">提示：Logo 會顯示在網站左上角（38x38px）和開場動畫</small>';
       }
@@ -3082,7 +3166,7 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 14. 輪播設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前輪播圖片（' + (D.carousel ? D.carousel.length : 0) + ' 張）：</p>';
         h += carouselHtml;
-        h += '<button onclick="manageCarousel()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理輪播圖片</button>';
+        h += '<button onclick="manageCarousel()" type="button" style="margin-top:10px;padding:9px 22px;background:var(--gold);color:var(--bg);border:none;cursor:pointer;font-size:.85rem;font-weight:700;border-radius:3px">管理輪播圖片</button>';
       }
 
       // ─── 6. 最新公告跑馬燈 ───
@@ -3117,7 +3201,7 @@ window.openBackendSettings = function(scrollToCloud) {
       // ─── 7. 服務項目說明 ───
       if (isSuperAdmin || canEdit('serviceDescriptions')) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 19. 服務項目說明</h3>';
-        h += '<button onclick="editServiceDescriptions()" class="swal2-confirm swal2-styled" style="margin-top:10px">編輯服務項目說明</button>';
+        h += '<button onclick="editServiceDescriptions()" type="button" style="margin-top:10px;padding:9px 22px;background:var(--gold);color:var(--bg);border:none;cursor:pointer;font-size:.85rem;font-weight:700;border-radius:3px">編輯服務項目說明</button>';
       }
 
       // ─── 8. 流程數字亮度 ───
@@ -3147,7 +3231,7 @@ window.openBackendSettings = function(scrollToCloud) {
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 22. 作品分類設定</h3>';
         h += '<p style="font-size:.85rem;color:var(--t2);margin-bottom:8px">目前作品分類（' + (D.pfCategories ? D.pfCategories.length : 0) + ' 個）：</p>';
         h += categoriesHtml;
-        h += '<button onclick="manageCategories()" class="swal2-confirm swal2-styled" style="margin-top:10px">管理作品分類</button>';
+        h += '<button onclick="manageCategories()" type="button" style="margin-top:10px;padding:9px 22px;background:var(--gold);color:var(--bg);border:none;cursor:pointer;font-size:.85rem;font-weight:700;border-radius:3px">管理作品分類</button>';
       }
 
       // ─── 10. 拖曳箭頭設定 ───
@@ -3304,39 +3388,37 @@ window.openBackendSettings = function(scrollToCloud) {
         }
       }
 
-      // ─── 15. 雲端同步設定（super_admin 或擁有 cloudSync 權限者可見） ───
-      if (isSuperAdmin || canEdit('cloudSync')) {
-        // 重新從 localStorage 取得最新 CLOUD 設定（確保顯示已儲存的值）
-        try {
-          var savedCloud = localStorage.getItem('MK5_CLOUD');
-          if (savedCloud) { Object.assign(CLOUD, JSON.parse(savedCloud)); }
-        } catch(e) {}
-        var cloudOk = CLOUD.token && CLOUD.owner && CLOUD.repo;
-        var cloudStatus = cloudOk
-          ? '<span style="color:#4ade80">✅ 已設定（' + CLOUD.owner + '/' + CLOUD.repo + '）</span>'
-          : '<span style="color:var(--t3)">⚪ 尚未設定</span>';
-        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ ☁️ 雲端同步設定</h3>';
-        h += '<p style="font-size:.82rem;color:var(--t2);margin-bottom:14px;line-height:1.8">';
-        h += '設定後，每次點擊「💾 儲存」將自動把最新內容同步到 GitHub。<br>';
-        h += '其他裝置（手機等）重新整理網站即可看到最新資訊，無需手動操作。<br>';
-        h += '目前狀態：' + cloudStatus + '</p>';
-        // ⚠️ 注意：SweetAlert2 用 DOMPurify 消毒 HTML，會移除所有 oninput/onclick 屬性
-        //    所以這裡不放 oninput，改在 didOpen 用 addEventListener 掛載
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">49. GitHub 用戶名稱：<input id="bs-cloud-owner" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.owner||'') + '" placeholder="your-github-username" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">50. 儲存庫名稱：<input id="bs-cloud-repo" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.repo||'') + '" placeholder="your-repo.github.io" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">51. 分支（Branch）：<input id="bs-cloud-branch" class="swal2-input" style="margin-top:4px" value="' + (CLOUD.branch||'main') + '" placeholder="main" autocomplete="off"></label>';
-        // Token 欄位：用 text 顯示（避免瀏覽器密碼管理器覆蓋 value）
-        var tokenDisplay = CLOUD.token ? CLOUD.token : '';
-        h += '<label style="display:block;margin-bottom:6px;font-size:.85rem">52. GitHub Token（Personal Access Token）：</label>';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-        h += '<input id="bs-cloud-token" class="swal2-input" style="margin:0;flex:1" type="text" value="' + tokenDisplay + '" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">';
-        h += '</div>';
-        h += '<small style="color:var(--t3);font-size:.75rem;display:block;margin-bottom:12px;line-height:1.7">';
-        h += '如何取得 Token：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens<br>';
-        h += '需要勾選：Repository → Contents → Read and Write 權限<br>';
-        h += '<b style="color:var(--gold)">⚠ Token 僅儲存在此裝置的 localStorage，不會上傳到 GitHub</b></small>';
-        h += '<button type="button" id="bs-cloud-test-btn" style="padding:7px 18px;background:var(--bg3);border:1px solid var(--gold);color:var(--gold);border-radius:6px;cursor:pointer;font-size:.85rem;transition:background .2s">🔌 測試連線</button>';
-        h += '<div id="bs-cloud-test-result" style="display:none;margin-top:10px;padding:9px 14px;border-radius:6px;font-size:.85rem;line-height:1.5"></div>';
+      // ─── 15. Supabase 連線狀態（資料庫 / 登入 / 儲存都在 Supabase） ───
+      if (isSuperAdmin) {
+        var sbStatus = sb
+          ? '<span style="color:#4ade80">✅ 已連線（' + (SUPABASE_URL.replace('https://','').split('.')[0]) + '・bucket：' + SUPABASE_BUCKET + '）</span>'
+          : '<span style="color:#f87171">❌ 未連線</span>';
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 🗄️ Supabase 連線</h3>';
+        h += '<p style="font-size:.82rem;color:var(--t2);margin-bottom:12px;line-height:1.8">';
+        h += '登入、資料庫與圖片/影片都由 Supabase 提供。點「💾 儲存」即寫入雲端，其他裝置重新整理即可看到最新內容。<br>';
+        h += '連線金鑰設定於 <b>app.js</b> 頂端（SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_BUCKET）。<br>';
+        h += '目前狀態：' + sbStatus + '</p>';
+      }
+
+      // ─── 16. 帳號審核 / 通知設定（僅 super_admin / 緊急入口） ───
+      if (isSuperAdmin) {
+        var ejs = bs.emailjs || {};
+        h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 🔐 帳號審核 / 通知設定</h3>';
+        // 申請信箱
+        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">申請信箱（新帳號申請通知寄到這裡）：<input id="bs-app-email" class="swal2-input" style="margin-top:4px" type="email" value="' + ((bs.appEmail||'').replace(/"/g,'&quot;')) + '" placeholder="markno.5.studio@gmail.com"></label>';
+        // 邀請碼
+        var curCode = (D && D._inviteCode) || '';
+        h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">邀請碼（6 位，給對方輸入即可立即成為一般編輯）：<input id="bs-invite-code" class="swal2-input" style="margin-top:4px" maxlength="6" inputmode="numeric" value="' + curCode + '" placeholder="留空＝停用邀請碼"></label>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">目前：' + (curCode ? ('<b style="color:#4ade80">已設定（' + curCode + '）</b>') : '未設定') + '。清空並儲存＝停用。</small>';
+        // EmailJS
+        h += '<div style="font-size:.85rem;margin:6px 0 4px;color:var(--t2)"><b>EMAILJS 設定</b>（免費電郵通知服務，emailjs.com 申請）</div>';
+        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">SERVICE ID：<input id="bs-emailjs-service" class="swal2-input" style="margin-top:4px" value="' + ((ejs.serviceId||'').replace(/"/g,'&quot;')) + '" placeholder="service_xxx" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">TEMPLATE ID：<input id="bs-emailjs-template" class="swal2-input" style="margin-top:4px" value="' + ((ejs.templateId||'').replace(/"/g,'&quot;')) + '" placeholder="template_xxx" autocomplete="off"></label>';
+        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">PUBLIC KEY：<input id="bs-emailjs-public" class="swal2-input" style="margin-top:4px" value="' + ((ejs.publicKey||'').replace(/"/g,'&quot;')) + '" placeholder="xxxxxxxxxxxxx" autocomplete="off"></label>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px;line-height:1.7">模板變數：<b style="color:var(--gold)">{{to_email}}</b>、<b style="color:var(--gold)">{{user_name}}</b>、<b style="color:var(--gold)">{{user_email}}</b>、<b style="color:var(--gold)">{{site_name}}</b>、<b style="color:var(--gold)">{{site_url}}</b>、<b style="color:#4ade80">{{invite_code}}</b>（邀請碼，核准時自動填入）。</small>';
+        // 緊急密碼
+        h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">管理員緊急設定密碼：<input id="bs-emergency-pw" class="swal2-input" style="margin-top:4px" type="password" placeholder="設定新密碼（留空＝不變）" autocomplete="new-password"></label>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">目前：' + (bs.emergencyHash ? '<b style="color:#4ade80">已設定</b>' : '未設定') + '。用於登入畫面「緊急設定入口」（只開後台設定用）。</small>';
       }
 
       h += '</div>';
@@ -3350,6 +3432,10 @@ window.openBackendSettings = function(scrollToCloud) {
     customClass: {
       container: 'backend-settings-modal'
     },
+    // ✅ 修正：willClose 在 .then() 之前執行，若在此清 __EMERGENCY，
+    //    .then() 裡的 isSuperAdmin 判斷會得到 false，導致 EmailJS 等設定不被儲存。
+    //    改用 didClose（在 .then() 之後執行）。
+    didClose: function() { window.__EMERGENCY = false; },
     didOpen: function() {
       var modal = document.querySelector('.swal2-popup');
       if (modal) {
@@ -3362,45 +3448,6 @@ window.openBackendSettings = function(scrollToCloud) {
           }
         });
       }
-      // 若從「☁️ 同步」按鈕進入，自動捲動到雲端同步設定區塊
-      if (scrollToCloud) {
-        var container = document.querySelector('.swal2-html-container');
-        var cloudH3 = container && Array.from(container.querySelectorAll('h3'))
-          .find(function(el) { return el.textContent.includes('雲端同步'); });
-        if (cloudH3) {
-          setTimeout(function() {
-            cloudH3.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            // 金色閃爍提示
-            cloudH3.style.transition = 'background .3s';
-            cloudH3.style.background = 'rgba(201,150,58,0.2)';
-            setTimeout(function() { cloudH3.style.background = ''; }, 1500);
-          }, 200);
-        }
-      }
-      // ✅ 測試連線按鈕：SweetAlert2 會移除 onclick 屬性（DOMPurify sanitize），
-      //    必須在 didOpen 裡用 addEventListener 掛事件
-      var testBtn = document.getElementById('bs-cloud-test-btn');
-      if (testBtn) {
-        testBtn.addEventListener('mouseover', function() { this.style.background = 'rgba(201,150,58,0.15)'; });
-        testBtn.addEventListener('mouseout',  function() { this.style.background = 'var(--bg3)'; });
-        testBtn.addEventListener('click', window.testCloudConnection);
-      }
-      // ✅ 雲端設定欄位即時儲存：DOMPurify 同樣移除 oninput，改用 addEventListener
-      var saveCloudFields = function() {
-        var o = document.getElementById('bs-cloud-owner');
-        var r = document.getElementById('bs-cloud-repo');
-        var b = document.getElementById('bs-cloud-branch');
-        var t = document.getElementById('bs-cloud-token');
-        if (o) CLOUD.owner  = o.value.trim();
-        if (r) CLOUD.repo   = r.value.trim();
-        if (b) CLOUD.branch = b.value.trim() || 'main';
-        if (t) CLOUD.token  = t.value.trim();
-        try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
-      };
-      ['bs-cloud-owner', 'bs-cloud-repo', 'bs-cloud-branch', 'bs-cloud-token'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('input', saveCloudFields);
-      });
       // ✅ 永不登出 checkbox：切換時啟用/停用數字輸入框
       var neverLogoutCb = document.getElementById('bs-never-logout');
       var logoutInput   = document.getElementById('bs-auto-logout');
@@ -3413,8 +3460,9 @@ window.openBackendSettings = function(scrollToCloud) {
     },
     preConfirm: function() {
       var v = {};
-      var isSuperAdmin = CU && CU.role === 'super_admin';
-      
+      var isSuperAdmin = (CU && CU.role === 'super_admin') || EMERGENCY;
+      var fbChanged = false; // 保留變數（Supabase 金鑰於 app.js 設定，不在此處變更）
+
       // 超級執行長或有權限的人才收集
       if (isSuperAdmin || canEdit('introTagline')) {
         var el = document.getElementById('bs-intro-tagline');
@@ -3617,20 +3665,48 @@ window.openBackendSettings = function(scrollToCloud) {
         var el = document.getElementById('bs-contact-email');
         if (el) v.contactEmail = el.value;
       }
-      
+
+      // ⚡ 超級執行長專屬欄位：必須在 preConfirm 內讀取！
+      // SweetAlert 的 .then() 執行時 dialog 已關閉、DOM 元素已消失，
+      // 用 getElementById 只會得到 null，導致 EmailJS / 邀請碼 / 緊急密碼永遠無法儲存。
+      if (isSuperAdmin) {
+        var _aeEl  = document.getElementById('bs-app-email');
+        if (_aeEl)  v._appEmail         = _aeEl.value.trim();
+        var _esEl  = document.getElementById('bs-emailjs-service');
+        if (_esEl)  v._emailjsServiceId  = _esEl.value.trim();
+        var _etEl  = document.getElementById('bs-emailjs-template');
+        if (_etEl)  v._emailjsTemplateId = _etEl.value.trim();
+        var _epEl  = document.getElementById('bs-emailjs-public');
+        if (_epEl)  v._emailjsPublicKey  = _epEl.value.trim();
+        var _icEl  = document.getElementById('bs-invite-code');
+        if (_icEl)  v._inviteCode        = _icEl.value.trim();
+        var _epwEl = document.getElementById('bs-emergency-pw');
+        if (_epwEl) v._emergencyPw       = _epwEl.value;
+      }
+
       return v;
     }
-  }).then(function(result) {
-    if (result.isConfirmed) {
-      var v = result.value;
-      
+  }).then(async function(result) {
+    if (!result.isConfirmed) return;
+    try {
+      var v = result.value || {};
+      // ✅ 重新宣告（preConfirm 作用域不同）
+      var isSuperAdmin = (CU && CU.role === 'super_admin') || (v && '_appEmail' in v);
+      var fbChanged = false;
+      console.log('🔧 openBackendSettings .then() 開始執行');
+      console.log('🔧 CU =', CU ? (CU.email + ' / role=' + CU.role) : 'null（未登入！）');
+      console.log('🔧 isSuperAdmin =', isSuperAdmin);
+      console.log('🔧 v._emailjsServiceId =', v._emailjsServiceId);
+      console.log('🔧 v._emailjsTemplateId =', v._emailjsTemplateId);
+      console.log('🔧 v._emailjsPublicKey =', v._emailjsPublicKey);
+
       // 更新首頁設定
       if (v.introTagline !== undefined) D.introTagline = v.introTagline;
       if (v.introTaglineSize !== undefined) D.introTaglineSize = v.introTaglineSize;
       if (v.heroSubtitle !== undefined) D.heroSubtitle = v.heroSubtitle;
       if (v.heroEnTitle !== undefined) D.heroEnTitle = v.heroEnTitle;
-      D.heroZhTitle = v.heroZhTitle;
-      D.heroDesc = v.heroDesc;
+      if (v.heroZhTitle !== undefined) D.heroZhTitle = v.heroZhTitle;
+      if (v.heroDesc !== undefined) D.heroDesc = v.heroDesc;
       if (v.marqueeItems !== undefined) D.marqueeItems = v.marqueeItems;
       if (v.marqueeColor !== undefined) D.marqueeColor = v.marqueeColor;
       if (v.marqueeSpeed !== undefined) D.marqueeSpeed = v.marqueeSpeed;
@@ -3642,14 +3718,14 @@ window.openBackendSettings = function(scrollToCloud) {
       if (v.datetimeSize !== undefined) D.theme.datetimeSize = v.datetimeSize;
       if (v.datetimeFont !== undefined) D.theme.datetimeFont = v.datetimeFont;
       if (v.heroEnFont !== undefined) D.theme.heroEnFont = v.heroEnFont;
-      D.theme.heroEnSize = v.heroEnSize;
-      D.theme.heroZhSize = v.heroZhSize;
-      D.theme.rippleColor = v.rippleColor;
-      D.theme.rippleOpacity = v.rippleOpacity;
-      D.theme.rippleSize = v.rippleSize;
-      D.theme.rippleWidth = v.rippleWidth;
-      D.theme.procNumOpacity = v.procNumOpacity;
-      D.theme.procNumHoverOpacity = v.procNumHoverOpacity;
+      if (v.heroEnSize !== undefined) D.theme.heroEnSize = v.heroEnSize;
+      if (v.heroZhSize !== undefined) D.theme.heroZhSize = v.heroZhSize;
+      if (v.rippleColor !== undefined) D.theme.rippleColor = v.rippleColor;
+      if (v.rippleOpacity !== undefined) D.theme.rippleOpacity = v.rippleOpacity;
+      if (v.rippleSize !== undefined) D.theme.rippleSize = v.rippleSize;
+      if (v.rippleWidth !== undefined) D.theme.rippleWidth = v.rippleWidth;
+      if (v.procNumOpacity !== undefined) D.theme.procNumOpacity = v.procNumOpacity;
+      if (v.procNumHoverOpacity !== undefined) D.theme.procNumHoverOpacity = v.procNumHoverOpacity;
       
       // 更新社群連結
       if (!D.social) D.social = {};
@@ -3688,49 +3764,116 @@ window.openBackendSettings = function(scrollToCloud) {
       if (v.email !== undefined) D.contactEmail = v.email;
       if (v.contactEmail !== undefined) D.contactEmail = v.contactEmail;
 
-      // ☁️ 雲端同步設定（只存在此裝置，不進入 D）
+      // 🔐 帳號審核 / 通知設定（值已在 preConfirm 讀入 v._* 中，此處不再碰 DOM）
       if (isSuperAdmin) {
-        var cOwner  = document.getElementById('bs-cloud-owner');
-        var cRepo   = document.getElementById('bs-cloud-repo');
-        var cBranch = document.getElementById('bs-cloud-branch');
-        var cToken  = document.getElementById('bs-cloud-token');
-        if (cOwner)  CLOUD.owner  = cOwner.value.trim();
-        if (cRepo)   CLOUD.repo   = cRepo.value.trim();
-        if (cBranch) CLOUD.branch = cBranch.value.trim() || 'main';
-        if (cToken)  CLOUD.token  = cToken.value.trim();
-        try { localStorage.setItem('MK5_CLOUD', JSON.stringify(CLOUD)); } catch(e) {}
-      }
-
-      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
-      persist();
-      applyTheme();
-      updateDOM();
-      if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
-      if (typeof applyDragGlowStyles === 'function') applyDragGlowStyles();
-      if (typeof updateDragArrowIcons === 'function') updateDragArrowIcons();
-
-      // 短暫顯示箭頭讓用戶確認設定效果（3秒後自動隱藏）
-      (function() {
-        var pl = document.getElementById('drag-arrow-left');
-        var pr = document.getElementById('drag-arrow-right');
-        if (pl && pr) {
-          positionDragArrows();
-          pl.classList.add('show'); pr.classList.add('show');
-          setTimeout(function() {
-            if (!draggedItem) { pl.classList.remove('show'); pr.classList.remove('show'); }
-          }, 3000);
+        if (v._appEmail !== undefined) {
+          D.backendSettings.appEmail = v._appEmail || 'markno.5.studio@gmail.com';
         }
-      })();
-
-      // 重新啟動自動登出和自動儲存計時器
-      if (CU) {
-        startAutoLogout();
-        startAutoSave();
+        // EmailJS：三個欄位只要有任何一個被讀到就整組更新
+        if (v._emailjsServiceId !== undefined || v._emailjsTemplateId !== undefined || v._emailjsPublicKey !== undefined) {
+          var oldE = D.backendSettings.emailjs || {};
+          D.backendSettings.emailjs = {
+            serviceId:  v._emailjsServiceId  !== undefined ? v._emailjsServiceId  : (oldE.serviceId  || ''),
+            templateId: v._emailjsTemplateId !== undefined ? v._emailjsTemplateId : (oldE.templateId || ''),
+            publicKey:  v._emailjsPublicKey  !== undefined ? v._emailjsPublicKey  : (oldE.publicKey  || '')
+          };
+        }
+        // 邀請碼 → 寫入 mk5_data/secret（與 main 分開；僅 super 可寫）
+        // ⚠ 重大修正：
+        //   舊版「只有值改變才寫」+「fire-and-forget、catch 只 console」
+        //   → 一旦某次寫入失敗，記憶體 D._inviteCode 仍是 88888（UI 顯示已設定），
+        //     但雲端 secret 其實是空的；之後因「值沒變」永遠不再寫 → 邀請信永遠空白。
+        //   新版：一律寫入 + await + 立即回讀驗證 + 失敗明確提示。
+        if (v._inviteCode !== undefined) {
+          var code = v._inviteCode;
+          D._inviteCode = code;
+          try {
+            // merge:true → 只更新 inviteCode，保留 secret 內的 blacklist（黑名單）不被清掉
+            await db.collection('mk5_data').doc('secret').set({ inviteCode: code }, { merge: true });
+            var _chk   = await db.collection('mk5_data').doc('secret').get();
+            var _saved = (_chk.exists && _chk.data() && _chk.data().inviteCode) || '';
+            if (_saved !== code) throw new Error('回讀不一致（雲端目前為「' + _saved + '」）');
+            console.log('🔑 邀請碼已確實寫入雲端 secret：', code || '(已清空＝停用)');
+          } catch (e) {
+            console.error('邀請碼寫入 secret 失敗：', e);
+            await Swal.fire({
+              title: '⚠ 邀請碼沒有存進雲端',
+              html: '畫面上看起來已設定，但<b>實際沒有寫入 Supabase</b>，所以寄出的邀請信會是空白。<br><br>' +
+                    '錯誤：<b style="color:#f87171">' + ((e && (e.message || e.code)) || e) + '</b><br><br>' +
+                    '請確認：帳號為 super_admin、已在 Supabase 執行 supabase_schema.sql，然後再按一次儲存。',
+              icon: 'error', confirmButtonText: '我知道了'
+            });
+          }
+        }
+        // 緊急密碼 → 存 SHA-256（非同步），之後再 persist 一次
+        if (v._emergencyPw) {
+          sha256(v._emergencyPw).then(function(hh) { D.backendSettings.emergencyHash = hh; persist(); });
+        }
       }
 
-      Swal.fire({title:'✅ 設定已儲存！',text:'所有後台設定已更新',timer:2000,showConfirmButton:false,icon:'success'});
-      // ☁️ 自動同步到 GitHub
-      if (CLOUD.token && CLOUD.owner && CLOUD.repo) cloudPush(true);
+      console.log('🔧 D.backendSettings.emailjs（準備寫入）=', JSON.stringify(D.backendSettings && D.backendSettings.emailjs));
+      logEdit(['introTagline','introTaglineSize','heroSubtitle','heroEnTitle','heroZhTitle','heroDesc','theme','social','backendSettings','contactEmail']);
+
+      // 寫入成功後才套用畫面 + 顯示「已儲存」
+      var finishSave = function() {
+        // ✅ 儲存成功後清除 EmailJS 首次設定旗標，避免下次開設定時重複判斷
+        _firstSetupPrompted = false;
+        console.log('✅ finishSave() 被呼叫，儲存流程完成');
+        applyTheme();
+        updateDOM();
+        if (typeof applyDragArrowStyles === 'function') applyDragArrowStyles();
+        if (typeof applyDragGlowStyles === 'function') applyDragGlowStyles();
+        if (typeof updateDragArrowIcons === 'function') updateDragArrowIcons();
+        (function() {
+          var pl = document.getElementById('drag-arrow-left');
+          var pr = document.getElementById('drag-arrow-right');
+          if (pl && pr) {
+            positionDragArrows();
+            pl.classList.add('show'); pr.classList.add('show');
+            setTimeout(function() {
+              if (!draggedItem) { pl.classList.remove('show'); pr.classList.remove('show'); }
+            }, 3000);
+          }
+        })();
+        if (CU) { startAutoLogout(); startAutoSave(); }
+        if (fbChanged) {
+          Swal.fire({
+            title:'✅ 設定已儲存！',
+            html:'其他設定已更新。',
+            icon:'success', confirmButtonText:'立即重新整理', allowOutsideClick:false
+          }).then(function(res) { if (res.isConfirmed) location.reload(); });
+        } else {
+          Swal.fire({title:'✅ 設定已儲存！',text:'所有後台設定已更新（已寫入 Supabase 雲端）',timer:2000,showConfirmButton:false,icon:'success'});
+        }
+      };
+
+      // 已登入管理員：等雲端寫入結果，成功才 finishSave，失敗顯示真正錯誤碼。
+      if (CU) {
+        console.log('🔧 CU 存在，呼叫 persistRaw()...');
+        try {
+          await persistRaw();
+          console.log('✅ persistRaw() 成功完成');
+          finishSave();
+        } catch(saveErr) {
+          var errMsg = (saveErr && (saveErr.message || saveErr.code || JSON.stringify(saveErr))) || '未知錯誤';
+          console.error('❌ persistRaw() 失敗：', errMsg, saveErr);
+          Swal.fire({
+            title: '❌ 儲存失敗',
+            html: '<b style="color:#f87171">' + errMsg + '</b>' +
+              '<br><br><small style="color:var(--t2)">請按 F12 → Console 查看詳細錯誤。<br>常見原因：<br>1. Supabase RLS 政策阻擋（帳號不在 admins 表）<br>2. Supabase 連線問題<br>3. 已在 Supabase 執行 supabase_schema.sql？</small>',
+            icon: 'error', confirmButtonText: '確認'
+          });
+        }
+      } else {
+        // 緊急入口（未登入）：僅更新畫面，不寫雲端
+        console.warn('⚠️ CU 為 null，跳過 persistRaw()，不寫入 Supabase！');
+        finishSave();
+      }
+    } catch(outerErr) {
+      // 捕捉 .then() 內任何意外 JS 錯誤
+      var outerMsg = (outerErr && (outerErr.message || String(outerErr))) || '未知錯誤';
+      console.error('❌ openBackendSettings .then() 內部錯誤：', outerMsg, outerErr);
+      alert('後台設定儲存流程發生錯誤：\n' + outerMsg + '\n\n請按 F12 → Console 查看詳細資訊。');
     }
   });
 };
@@ -3805,7 +3948,7 @@ window.showInbox = function() {
       html += '<td style="padding:12px 8px;font-size:.8rem;color:var(--t3)">' + unreadDot + (msg.time || '') + '</td>';
       html += '<td style="padding:12px 8px;font-size:.85rem">' + (msg.email || '') + '</td>';
       html += '<td style="padding:12px 8px;font-size:.85rem">' + (msg.subject || '') + '</td>';
-      html += '<td style="padding:12px 8px"><button onclick="replyMessage(' + i + ')" class="swal2-confirm swal2-styled" style="margin:0;padding:6px 12px;font-size:.8rem">回覆</button></td>';
+      html += '<td style="padding:12px 8px"><button onclick="replyMessage(' + i + ')" type="button" style="margin:0;padding:6px 12px;font-size:.8rem;background:var(--gold);color:var(--bg);border:none;cursor:pointer;font-weight:700;border-radius:3px">回覆</button></td>';
       html += '</tr>';
     }
     
@@ -3902,11 +4045,12 @@ window.showUsers = function() {
       html += '<span class="user-role-badge ' + roleClass + '">' + roleName + '</span>';
       if (u.online) html += '<span class="user-online-status">● 在線</span>';
       html += '</div>';
-      html += '<div class="user-meta">' + u.username + ' · 最後登入：' + (u.lastSeen||'從未') + '</div>';
+      html += '<div class="user-meta">' + (u.email||'') + ' · 最後登入：' + (u.lastSeen||'從未') + '</div>';
       html += '</div>';
       html += '<div class="user-actions">';
       html += '<button class="user-action-btn" onclick="editUserAt(' + i + ')">編輯</button>';
       if (u.role !== 'super_admin') {
+        html += '<button class="user-action-btn delete" onclick="banUserAt(' + i + ')">禁止登入</button>';
         html += '<button class="user-action-btn delete" onclick="delUserAt(' + i + ')">刪除</button>';
       }
       html += '</div>';
@@ -3916,13 +4060,13 @@ window.showUsers = function() {
   }
 
   var _isAdmin = CU && CU.role === 'super_admin';
-  var _myName  = CU && CU.username;
+  var _myEmail = (CU && CU.email || '').toLowerCase();
 
   // 超級執行長：看所有人紀錄 | 其他人：只看自己的紀錄
   var logs = D.editLog || [];
   var visibleLogs = [];
   for (var _li = 0; _li < logs.length; _li++) {
-    if (_isAdmin || logs[_li].username === _myName) {
+    if (_isAdmin || (logs[_li].email || '').toLowerCase() === _myEmail) {
       visibleLogs.push({ log: logs[_li], idx: _li });
     }
   }
@@ -3950,7 +4094,51 @@ window.showUsers = function() {
       (_isAdmin ? '尚無任何編輯紀錄' : '您尚無任何編輯紀錄') + '</div>';
   }
 
-  window.delUserAt = function(i) { D.users.splice(i, 1); persist(); document.getElementById('ulistw').innerHTML = uLH(); };
+  window.delUserAt = function(i) {
+    var u = D.users[i]; if (!u) return;
+    Swal.fire({
+      title:'確定移除此管理員？',
+      html:'將移除「' + (u.name || '') + '」（' + (u.email||'') + '）的後台權限。<br><small style="color:var(--t3)">註：對方的 Google 登入帳號仍存在，但會變回「待審核」；如需完全封鎖，請在 Supabase 主控台 → Authentication → Users 停用該帳號。</small>',
+      icon:'warning', showCancelButton:true, confirmButtonText:'移除', cancelButtonText:'取消'
+    }).then(function(r) {
+      if (!r.isConfirmed) return;
+      var p = (u.uid) ? db.collection('admins').doc(u.uid).delete() : Promise.resolve();
+      p.then(function() {
+        D.users.splice(i, 1);
+        document.getElementById('ulistw').innerHTML = uLH();
+      }).catch(function(e) { Swal.fire({title:'移除失敗',text:(e.message||e),icon:'error'}); });
+    });
+  };
+  // 禁止登入（黑名單）：移除權限 + 加入黑名單，對方無法再登入或用邀請碼
+  window.banUserAt = function(i) {
+    var u = D.users[i]; if (!u) return;
+    if (u.role === 'super_admin') { Swal.fire({ title:'無法停權', text:'超級執行長帳號不可被停權。', icon:'warning' }); return; }
+    Swal.fire({
+      title:'禁止此帳號登入？',
+      html:'將把「' + (u.name || '') + '」（' + (u.email||'') + '）<b style="color:#f87171">加入黑名單</b>：<br>立即移除後台權限，且<b>無法再次登入或使用邀請碼</b>。<br><small style="color:var(--t3)">日後可在「⛔ 黑名單」清單按「解除」恢復。</small>',
+      icon:'warning', showCancelButton:true, confirmButtonText:'禁止登入', cancelButtonText:'取消', confirmButtonColor:'#B52020'
+    }).then(function(r) {
+      if (!r.isConfirmed) return;
+      sb.rpc('ban_user', { p_email: (u.email||'').toLowerCase() }).then(function(rr) {
+        if (rr && rr.error) throw rr.error;
+        D.users.splice(i, 1);
+        Swal.fire({ title:'✅ 已禁止登入', timer:1300, showConfirmButton:false, icon:'success' }).then(showUsers);
+      }).catch(function(e) { Swal.fire({ title:'操作失敗', text:(e.message||e), icon:'error' }); });
+    });
+  };
+  // 解除黑名單
+  window.unbanEmail = function(email) {
+    Swal.fire({
+      title:'解除停權？', html:'將允許 <b>' + email + '</b> 重新登入並申請帳號。',
+      icon:'question', showCancelButton:true, confirmButtonText:'解除', cancelButtonText:'取消'
+    }).then(function(r) {
+      if (!r.isConfirmed) return;
+      sb.rpc('unban_user', { p_email: email }).then(function(rr) {
+        if (rr && rr.error) throw rr.error;
+        Swal.fire({ title:'✅ 已解除', timer:1100, showConfirmButton:false, icon:'success' }).then(showUsers);
+      }).catch(function(e) { Swal.fire({ title:'操作失敗', text:(e.message||e), icon:'error' }); });
+    });
+  };
   window.restoreSnap = function(li) {
     Swal.fire({ title:'確定還原？', text:'將還原至此版本', icon:'warning', showCancelButton:true, confirmButtonText:'確定還原', cancelButtonText:'取消' }).then(function(r2) {
       if (r2.isConfirmed) {
@@ -3980,9 +4168,9 @@ window.showUsers = function() {
         return;
       }
       
-      // 放寬檔案大小限制到 5MB
-      if (file.size > 5000000) {
-        Swal.fire({title:'檔案過大',text:'請選擇小於 5MB 的圖片',icon:'error'});
+      // 放寬檔案大小限制（Supabase Storage 免費方案單檔上限約 50MB）
+      if (file.size > 50000000) {
+        Swal.fire({title:'檔案過大',text:'請選擇小於 50MB 的圖片',icon:'error'});
         return;
       }
       
@@ -3995,29 +4183,32 @@ window.showUsers = function() {
           canvas.width = 80;
           canvas.height = 80;
           var ctx = canvas.getContext('2d');
-          
+
           // 計算裁切（保持中心）
           var size = Math.min(img.width, img.height);
           var x = (img.width - size) / 2;
           var y = (img.height - size) / 2;
-          
+
           ctx.drawImage(img, x, y, size, size, 0, 0, 80, 80);
-          
-          // 轉為 JPEG base64（高品質壓縮）
-          var avatarData = canvas.toDataURL('image/jpeg', 0.9);
-          D.users[userIdx].avatar = avatarData;
-          
-          // 如果是當前用戶，也更新 CU
-          if (CU && CU.username === D.users[userIdx].username) {
-            CU.avatar = avatarData;
-            sessionStorage.setItem('mk5cu', JSON.stringify(CU));
-            updateAdminUI(); // 更新後台顯示
-          }
-          
-          logEdit(['users']);
-          persist();
-          document.getElementById('ulistw').innerHTML = uLH();
-          Swal.fire({title:'✅ 大頭貼已上傳！',timer:1200,showConfirmButton:false,icon:'success'});
+
+          // 縮圖後上傳到 Storage，只保存網址
+          Swal.fire({ title:'上傳中…', didOpen:function(){ Swal.showLoading(); }, allowOutsideClick:false });
+          canvasToBlob(canvas, 'image/jpeg', 0.9)
+            .then(function(blob) { return uploadToStorage(blob, 'avatars', 'jpg'); })
+            .then(function(url) {
+              D.users[userIdx].avatar = url;
+              // 如果是當前用戶，也更新 CU
+              if (CU && (CU.email || '').toLowerCase() === (D.users[userIdx].email || '').toLowerCase()) {
+                CU.avatar = url;
+                if (typeof updateAdminUI === 'function') updateAdminUI(); // 更新後台顯示
+              }
+              return saveAdmin(D.users[userIdx]); // 寫入該管理員 doc
+            })
+            .then(function() {
+              document.getElementById('ulistw').innerHTML = uLH();
+              Swal.fire({title:'✅ 大頭貼已上傳！',timer:1200,showConfirmButton:false,icon:'success'});
+            })
+            .catch(function(err) { Swal.fire({title:'上傳失敗',text:(err.message||err),icon:'error'}); });
         };
         img.src = evt.target.result;
       };
@@ -4038,8 +4229,9 @@ window.showUsers = function() {
             '<button onclick="editUploadAvatar(' + i + ')" style="position:absolute;bottom:-5px;right:-5px;width:28px;height:28px;border-radius:50%;background:var(--gold);border:2px solid var(--bg);color:var(--bg);cursor:pointer;font-size:.75rem"><i class="fa-solid fa-camera"></i></button>' +
             '</div></div>' +
             '<input id="eu-nm" class="swal2-input" value="' + u.name + '" placeholder="顯示名稱">' +
-            '<input id="eu-un" class="swal2-input" value="' + u.username + '" placeholder="帳號">' +
-            '<input id="eu-pw" type="password" class="swal2-input" placeholder="新密碼（留空不變）">' +
+            '<input id="eu-em" class="swal2-input" value="' + (u.email||'') + '" placeholder="Email（Google 登入帳號）" readonly style="opacity:.7;cursor:not-allowed">' +
+            (CU.role === 'super_admin' ?
+              '<select id="eu-role" class="swal2-input"><option value="editor"' + (u.role==='editor'?' selected':'') + '>一般編輯</option><option value="ops_admin"' + (u.role==='ops_admin'?' selected':'') + '>營運長</option><option value="super_admin"' + (u.role==='super_admin'?' selected':'') + '>超級執行長</option></select>' : '') +
 
             (CU.role === 'super_admin' ? '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.9rem;display:block;margin-bottom:8px">可編輯項目：</strong><div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);padding:10px;background:var(--bg2)" id="perm-list"></div></div>' : ''),
       showCancelButton: true, confirmButtonText: '儲存',
@@ -4061,20 +4253,24 @@ window.showUsers = function() {
       },
       preConfirm: function() {
         var nm = document.getElementById('eu-nm').value.trim();
-        var un = document.getElementById('eu-un').value.trim();
-        var pw = document.getElementById('eu-pw').value;
-        var role = u.role; // 角色不可修改
-        if (!nm || !un) { Swal.showValidationMessage('名稱和帳號必填'); return false; }
-        var permissions = [];
-        var cbs = document.querySelectorAll('.perm-cb:checked');
-        for (var k = 0; k < cbs.length; k++) permissions.push(cbs[k].value);
-        return { name:nm, username:un, password:pw||u.password, role:role, permissions:permissions };
+        if (!nm) { Swal.showValidationMessage('顯示名稱必填'); return false; }
+        var out = { name:nm };
+        if (CU.role === 'super_admin') {
+          var roleEl = document.getElementById('eu-role');
+          if (roleEl) out.role = roleEl.value;
+          var permissions = [];
+          var cbs = document.querySelectorAll('.perm-cb:checked');
+          for (var k = 0; k < cbs.length; k++) permissions.push(cbs[k].value);
+          out.permissions = permissions;
+        }
+        return out; // email 不可改（= Google 帳號）；密碼由 Google 管理
       }
     }).then(function(r) {
       if (r.isConfirmed) {
         D.users[i] = Object.assign({}, D.users[i], r.value);
-        if (CU && CU.username === u.username) { CU = Object.assign({}, CU, r.value); sessionStorage.setItem('mk5cu', JSON.stringify(CU)); }
-        persist(); showUsers();
+        if (CU && (CU.email || '').toLowerCase() === (u.email || '').toLowerCase()) { CU = Object.assign({}, CU, r.value); }
+        saveAdmin(D.users[i]).then(function(){ showUsers(); })
+          .catch(function(e){ Swal.fire({title:'儲存失敗',text:(e.message||e),icon:'error'}); });
       }
     });
     
@@ -4086,8 +4282,8 @@ window.showUsers = function() {
       input.onchange = function(e) {
         var file = e.target.files[0];
         if (!file || !file.type.startsWith('image/')) return;
-        if (file.size > 5000000) {
-          Swal.fire({title:'檔案過大',text:'請選擇小於 5MB 的圖片',icon:'error'});
+        if (file.size > 50000000) {
+          Swal.fire({title:'檔案過大',text:'請選擇小於 50MB 的圖片',icon:'error'});
           return;
         }
         var reader = new FileReader();
@@ -4102,9 +4298,15 @@ window.showUsers = function() {
             var x = (img.width - size) / 2;
             var y = (img.height - size) / 2;
             ctx.drawImage(img, x, y, size, size, 0, 0, 80, 80);
-            var avatarData = canvas.toDataURL('image/jpeg', 0.9);
-            D.users[userIdx].avatar = avatarData;
-            document.getElementById('edit-avatar-preview').src = avatarData;
+            // 縮圖後上傳到 Storage，只保存網址
+            canvasToBlob(canvas, 'image/jpeg', 0.9)
+              .then(function(blob) { return uploadToStorage(blob, 'avatars', 'jpg'); })
+              .then(function(url) {
+                D.users[userIdx].avatar = url;
+                var pv = document.getElementById('edit-avatar-preview');
+                if (pv) pv.src = url;
+              })
+              .catch(function(err) { Swal.fire({title:'上傳失敗',text:(err.message||err),icon:'error'}); });
           };
           img.src = evt.target.result;
         };
@@ -4114,43 +4316,116 @@ window.showUsers = function() {
     };
   };
 
+  var pendingBlock = _isAdmin
+    ? '<div style="margin-top:14px;text-align:left"><strong style="color:var(--gold);font-size:.8rem;letter-spacing:.1em">⏳ 待審核申請</strong>' +
+      '<div id="pending-apps" style="max-height:180px;overflow-y:auto;margin-top:6px;font-size:.82rem;color:var(--t3)">載入中…</div></div>'
+    : '';
+
+  var blacklistBlock = _isAdmin
+    ? '<div style="margin-top:14px;text-align:left"><strong style="color:var(--red);font-size:.8rem;letter-spacing:.1em">⛔ 黑名單（已停權）</strong>' +
+      '<div id="blacklist-box" style="max-height:160px;overflow-y:auto;margin-top:6px;font-size:.82rem;color:var(--t3)">載入中…</div></div>'
+    : '';
+
   Swal.fire({
     title: '👥 帳號管理', width: 560,
     html: '<div id="ulistw" style="text-align:left;max-height:220px;overflow-y:auto">' + uLH() + '</div>' +
-          '<button onclick="addUserDlg()" style="margin-top:12px;background:var(--gold);border:none;color:var(--bg);padding:8px 18px;cursor:pointer;font-size:.82rem;font-weight:700">＋ 新增帳號</button>' +
+          '<button onclick="addUserDlg()" style="margin-top:12px;background:var(--bg3);border:1px solid var(--border-g);color:var(--gold);padding:8px 18px;cursor:pointer;font-size:.82rem">＋ 如何新增帳號？</button>' +
+          pendingBlock +
+          blacklistBlock +
           '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.75rem;letter-spacing:.1em">' + logSectionTitle + '</strong>' +
           '<div style="max-height:160px;overflow-y:auto;margin-top:6px">' + logRows + '</div></div>',
     confirmButtonText: '關閉', showCancelButton: false,
     didOpen: function() {
+      // 新增帳號改為說明：Google 帳號無法由前端代為建立
       window.addUserDlg = function() {
         Swal.fire({
-          title: '新增帳號',
-          html: '<input id="nu-nm" class="swal2-input" placeholder="顯示名稱">' +
-                '<input id="nu-un" class="swal2-input" placeholder="帳號（英文）">' +
-                '<input id="nu-pw" type="password" class="swal2-input" placeholder="密碼">' +
-                '<select id="nu-ro" class="swal2-input">' +
-                  '<option value="editor">一般編輯</option>' +
-                  '<option value="ops_admin">營運長</option>' +
-                  '<option value="super_admin">超級執行長</option>' +
-                '</select>',
-          showCancelButton: true, confirmButtonText: '新增',
-          preConfirm: function() {
-            var nm = document.getElementById('nu-nm').value.trim();
-            var un = document.getElementById('nu-un').value.trim();
-            var pw = document.getElementById('nu-pw').value;
-            if (!nm || !un || !pw) { Swal.showValidationMessage('請填寫所有欄位'); return false; }
-            for (var i = 0; i < D.users.length; i++) if (D.users[i].username === un) { Swal.showValidationMessage('帳號已存在'); return false; }
-            return { name:nm, username:un, password:pw, role:document.getElementById('nu-ro').value, online:false, lastSeen:'' };
-          }
-        }).then(function(r2) { if (r2.isConfirmed) { D.users.push(r2.value); persist(); showUsers(); } });
+          title: '如何新增帳號',
+          icon: 'info',
+          html: '<div style="text-align:left;line-height:1.9;font-size:.9rem">' +
+                '1. 請對方用自己的 <b>Google 帳號</b>到本網站點「後台登入」。<br>' +
+                '2. 對方會看到「帳號待審核」畫面，申請通知會寄到申請信箱。<br>' +
+                '3. 你可在此「⏳ 待審核申請」清單按「核准」；或把 <b>邀請碼</b>給對方，對方輸入後即可立即成為一般編輯。' +
+                '</div>',
+          confirmButtonText: '了解'
+        });
       };
+
+      // 核准 / 拒絕
+      window.approveApp = function(uid, email, name) {
+        sb.rpc('approve_application', { p_uid: uid, p_data: {
+          email: (email||'').toLowerCase(), name: name || (email||'').split('@')[0],
+          role: 'editor', permissions: [], avatar: '', online: false, lastSeen: ''
+        }}).then(async function(r) {
+          if (r && r.error) throw r.error;
+          // ✅ 核准後自動寄邀請碼給被核准的使用者
+          // sendInviteEmail 會在「沒寄出」時自行提示原因（未設定 EmailJS／未設定邀請碼／寄送失敗）
+          var sent = await sendInviteEmail(email, name);
+          if (sent) {
+            await Swal.fire({ title:'✅ 已核准', text:'邀請碼已自動寄出給 ' + email, timer:2000, showConfirmButton:false, icon:'success' });
+          }
+          showUsers(); // 不論是否寄出都重新整理清單
+        }).catch(function(e) { Swal.fire({ title:'核准失敗', text:(e.message||e), icon:'error' }); });
+      };
+      window.rejectApp = function(uid) {
+        Swal.fire({ title:'拒絕此申請？', icon:'warning', showCancelButton:true, confirmButtonText:'拒絕' }).then(function(r) {
+          if (!r.isConfirmed) return;
+          db.collection('applications').doc(uid).delete()
+            .then(function() { Swal.fire({ title:'已拒絕', timer:1000, showConfirmButton:false }); setTimeout(showUsers, 600); })
+            .catch(function(e) { Swal.fire({ title:'操作失敗', text:(e.message||e), icon:'error' }); });
+        });
+      };
+
+      // 載入待審核清單
+      if (_isAdmin) {
+        db.collection('applications').get().then(function(qs) {
+          var box = document.getElementById('pending-apps');
+          if (!box) return;
+          if (qs.empty) { box.innerHTML = '<div style="padding:6px 0">目前沒有待審核申請</div>'; return; }
+          var html = '';
+          qs.forEach(function(doc) {
+            var a = doc.data(); var uid = doc.id;
+            var safeName = (a.name || '(未命名)').replace(/'/g, '');
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+              '<div style="flex:1"><div style="color:var(--t1)">' + (a.name || '(未命名)') + '</div><div style="font-size:.72rem;color:var(--t3)">' + (a.email||'') + '</div></div>' +
+              '<button onclick="approveApp(\'' + uid + '\',\'' + (a.email||'') + '\',\'' + safeName + '\')" style="background:var(--gold);border:none;color:var(--bg);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:700">核准</button>' +
+              '<button onclick="rejectApp(\'' + uid + '\')" style="background:transparent;border:1px solid var(--red);color:var(--red);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:.75rem">拒絕</button>' +
+            '</div>';
+          });
+          box.innerHTML = html;
+        }).catch(function(e) {
+          var box = document.getElementById('pending-apps');
+          if (box) box.innerHTML = '<div style="color:var(--red)">讀取失敗：' + (e.message||e) + '</div>';
+        });
+
+        // 載入黑名單（super 可直接讀 secret.blacklist）
+        db.collection('mk5_data').doc('secret').get().then(function(s) {
+          var box = document.getElementById('blacklist-box');
+          if (!box) return;
+          var list = (s.exists && s.data() && s.data().blacklist) || [];
+          if (!list.length) { box.innerHTML = '<div style="padding:6px 0">目前沒有被停權的帳號</div>'; return; }
+          var html = '';
+          for (var bi = 0; bi < list.length; bi++) {
+            var em = list[bi] || '';
+            var safeEm = em.replace(/'/g, '');
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+              '<div style="flex:1;color:var(--t2)">⛔ ' + em + '</div>' +
+              '<button onclick="unbanEmail(\'' + safeEm + '\')" style="background:transparent;border:1px solid var(--gold);color:var(--gold);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:.75rem">解除</button>' +
+            '</div>';
+          }
+          box.innerHTML = html;
+        }).catch(function(e) {
+          var box = document.getElementById('blacklist-box');
+          if (box) box.innerHTML = '<div style="color:var(--red)">讀取失敗：' + (e.message||e) + '</div>';
+        });
+      }
     }
   });
 };
 
 window.editMyProfile = function() {
+  var em = (CU && CU.email || '').toLowerCase();
   var i = -1;
-  for (var j = 0; j < D.users.length; j++) if (D.users[j].username === (CU && CU.username)) { i = j; break; }
+  for (var j = 0; j < D.users.length; j++) if ((D.users[j].email || '').toLowerCase() === em) { i = j; break; }
   if (i >= 0) editUserAt(i);
 };
 
@@ -4240,14 +4515,14 @@ function trackVisit() {
       if (data && data.country_name) {
         var loc = data.country_name + (data.city ? ' / ' + data.city : '');
         D.analytics.byLocation[loc] = (D.analytics.byLocation[loc] || 0) + 1;
-        persist();
+        persistAnalytics();
       }
     })
-    .catch(function(e) { 
-      console.log('Location API unavailable:', e.message); 
+    .catch(function(e) {
+      console.log('Location API unavailable:', e.message);
     });
-  
-  persist();
+
+  persistAnalytics();
 }
 
 /* Excel 匯出函數 */
