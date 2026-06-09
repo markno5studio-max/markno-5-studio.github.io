@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.09.01';
+const SITE_VERSION = '2026.06.09.02';
 
 /* ============================================================
    STORAGE KEY
@@ -4327,11 +4327,6 @@ window.showUsers = function() {
     };
   };
 
-  var pendingBlock = _isAdmin
-    ? '<div style="margin-top:14px;text-align:left"><strong style="color:var(--gold);font-size:.8rem;letter-spacing:.1em">⏳ 待審核申請</strong>' +
-      '<div id="pending-apps" style="max-height:180px;overflow-y:auto;margin-top:6px;font-size:.82rem;color:var(--t3)">載入中…</div></div>'
-    : '';
-
   var blacklistBlock = _isAdmin
     ? '<div style="margin-top:14px;text-align:left"><strong style="color:var(--red);font-size:.8rem;letter-spacing:.1em">⛔ 黑名單（已停權）</strong>' +
       '<div id="blacklist-box" style="max-height:160px;overflow-y:auto;margin-top:6px;font-size:.82rem;color:var(--t3)">載入中…</div></div>'
@@ -4341,7 +4336,6 @@ window.showUsers = function() {
     title: '👥 帳號管理', width: 560,
     html: '<div id="ulistw" style="text-align:left;max-height:220px;overflow-y:auto">' + uLH() + '</div>' +
           '<button onclick="addUserDlg()" style="margin-top:12px;background:var(--bg3);border:1px solid var(--border-g);color:var(--gold);padding:8px 18px;cursor:pointer;font-size:.82rem">＋ 如何新增帳號？</button>' +
-          pendingBlock +
           blacklistBlock +
           '<div style="margin-top:16px;text-align:left"><strong style="color:var(--gold);font-size:.75rem;letter-spacing:.1em">' + logSectionTitle + '</strong>' +
           '<div style="max-height:160px;overflow-y:auto;margin-top:6px">' + logRows + '</div></div>',
@@ -4355,61 +4349,15 @@ window.showUsers = function() {
           html: '<div style="text-align:left;line-height:1.9;font-size:.9rem">' +
                 '1. 請對方用自己的 <b>Google 帳號</b>到本網站點「後台登入」。<br>' +
                 '2. 對方一登入，系統會自動把含 <b>邀請碼</b> 的通知信寄到管理信箱 <b>markno.5.studio@gmail.com</b>。<br>' +
-                '3. 你把信中的 <b>邀請碼</b> 轉交給對方，對方在「請輸入邀請碼」畫面輸入後，即可立即成為一般編輯（不需另外按核准）。<br>' +
-                '<small style="color:var(--t3)">＊若仍想手動審核，也可在下方「⏳ 待審核申請」清單按「核准」。</small>' +
+                '3. 你把信中的 <b>邀請碼</b> 轉交給對方，對方在「請輸入邀請碼」畫面輸入後，即可立即成為一般編輯。<br>' +
+                '<small style="color:var(--t3)">＊全程不需在後台按「核准」；若要移除或封鎖某帳號，用上方清單的「刪除／禁止登入」。</small>' +
                 '</div>',
           confirmButtonText: '了解'
         });
       };
 
-      // 核准 / 拒絕
-      window.approveApp = function(uid, email, name) {
-        sb.rpc('approve_application', { p_uid: uid, p_data: {
-          email: (email||'').toLowerCase(), name: name || (email||'').split('@')[0],
-          role: 'editor', permissions: [], avatar: '', online: false, lastSeen: ''
-        }}).then(async function(r) {
-          if (r && r.error) throw r.error;
-          // ✅ 核准後自動寄邀請碼給被核准的使用者
-          // sendInviteEmail 會在「沒寄出」時自行提示原因（未設定 EmailJS／未設定邀請碼／寄送失敗）
-          var sent = await sendInviteEmail(email, name);
-          if (sent) {
-            await Swal.fire({ title:'✅ 已核准', text:'邀請碼已自動寄出給 ' + email, timer:2000, showConfirmButton:false, icon:'success' });
-          }
-          showUsers(); // 不論是否寄出都重新整理清單
-        }).catch(function(e) { Swal.fire({ title:'核准失敗', text:(e.message||e), icon:'error' }); });
-      };
-      window.rejectApp = function(uid) {
-        Swal.fire({ title:'拒絕此申請？', icon:'warning', showCancelButton:true, confirmButtonText:'拒絕' }).then(function(r) {
-          if (!r.isConfirmed) return;
-          db.collection('applications').doc(uid).delete()
-            .then(function() { Swal.fire({ title:'已拒絕', timer:1000, showConfirmButton:false }); setTimeout(showUsers, 600); })
-            .catch(function(e) { Swal.fire({ title:'操作失敗', text:(e.message||e), icon:'error' }); });
-        });
-      };
-
-      // 載入待審核清單
+      // 載入黑名單（super 可直接讀 secret.blacklist）
       if (_isAdmin) {
-        db.collection('applications').get().then(function(qs) {
-          var box = document.getElementById('pending-apps');
-          if (!box) return;
-          if (qs.empty) { box.innerHTML = '<div style="padding:6px 0">目前沒有待審核申請</div>'; return; }
-          var html = '';
-          qs.forEach(function(doc) {
-            var a = doc.data(); var uid = doc.id;
-            var safeName = (a.name || '(未命名)').replace(/'/g, '');
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
-              '<div style="flex:1"><div style="color:var(--t1)">' + (a.name || '(未命名)') + '</div><div style="font-size:.72rem;color:var(--t3)">' + (a.email||'') + '</div></div>' +
-              '<button onclick="approveApp(\'' + uid + '\',\'' + (a.email||'') + '\',\'' + safeName + '\')" style="background:var(--gold);border:none;color:var(--bg);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:700">核准</button>' +
-              '<button onclick="rejectApp(\'' + uid + '\')" style="background:transparent;border:1px solid var(--red);color:var(--red);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:.75rem">拒絕</button>' +
-            '</div>';
-          });
-          box.innerHTML = html;
-        }).catch(function(e) {
-          var box = document.getElementById('pending-apps');
-          if (box) box.innerHTML = '<div style="color:var(--red)">讀取失敗：' + (e.message||e) + '</div>';
-        });
-
-        // 載入黑名單（super 可直接讀 secret.blacklist）
         db.collection('mk5_data').doc('secret').get().then(function(s) {
           var box = document.getElementById('blacklist-box');
           if (!box) return;
