@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.09.04';
+const SITE_VERSION = '2026.06.09.06';
 
 /* ============================================================
    STORAGE KEY
@@ -2160,10 +2160,13 @@ function renderPF() {
     items = items.filter(function(item) { return item.cat === CF; });
   }
 
-  if (!items.length) { 
-    c.innerHTML = '<div class="pf-empty">沒有找到符合的作品</div>'; 
+  if (!items.length) {
+    // 登入者即使在沒有作品的分類，也能看到「＋ 新增作品」卡片；一般訪客 / 搜尋無結果則顯示提示
+    c.innerHTML = (CU && !SQ)
+      ? '<div class="pf-add-card" onclick="editPortfolio(-1)" title="新增作品"><div class="pf-add-plus"><i class="fa-solid fa-plus"></i></div><div class="pf-add-text">新增作品</div></div>'
+      : '<div class="pf-empty">沒有找到符合的作品</div>';
     if (paginationDiv) paginationDiv.innerHTML = '';
-    return; 
+    return;
   }
 
   // 計算分頁
@@ -2195,6 +2198,13 @@ function renderPF() {
     html += '</div>';
     html += '<div class="pf-info"><h3>' + item.title + '</h3><p>' + item.description + '</p></div>';
     html += '</div>';
+  }
+  // 登入者：在最後一頁的作品後面，附上一張「＋ 新增作品」卡片（搜尋時不顯示，避免干擾搜尋結果）
+  if (CU && !SQ && PF_PAGE === totalPages - 1) {
+    html += '<div class="pf-add-card" onclick="editPortfolio(-1)" title="新增作品">' +
+              '<div class="pf-add-plus"><i class="fa-solid fa-plus"></i></div>' +
+              '<div class="pf-add-text">新增作品</div>' +
+            '</div>';
   }
   c.innerHTML = html;
   
@@ -2954,7 +2964,7 @@ window.showLoginModal = function() {
   if (!auth || !sb) { Swal.fire({ title:'Supabase Auth 尚未初始化', text:'請確認 app.js 已填入 Supabase 金鑰。', icon:'error' }); return; }
   Swal.fire({
     title: '後台登入',
-    html: '<p style="color:var(--t2);font-size:.9rem;line-height:1.8;margin-bottom:6px">請使用 Google 帳號登入。<br>新帳號需經管理者核准或輸入邀請碼。</p>',
+    html: '<p style="color:var(--t2);font-size:.9rem;line-height:1.8;margin-bottom:6px">請使用 Google 帳號登入。<br>新帳號需輸入管理者提供的邀請碼。</p>',
     showCancelButton: true,
     confirmButtonText: '<i class="fab fa-google"></i> 使用 Google 登入',
     cancelButtonText: '取消',
