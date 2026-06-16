@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.09.02';
+const SITE_VERSION = '2026.06.09.04';
 
 /* ============================================================
    STORAGE KEY
@@ -26,7 +26,7 @@ var KEY = 'MK5_DATA'; // 固定 key（僅用於相容/快取，主要資料存�
      5. Project Settings → API，把 Project URL 與 Publishable key 填到下方。
 ============================================================ */
 var SUPABASE_URL      = 'https://pnuhqvciedctovibrqmu.supabase.co';        // Project URL
-var SUPABASE_ANON_KEY = 'sb_publishable_NgpeQdfJufQP3wcSylXfjQ_hmQmZTlt';  // Publishable key（可公開）
+var SUPABASE_ANON_KEY = 'sb_publishable_6o2RDhsp3pH1roEqMAZqeQ_v1shcB1t';  // Publishable key（可公開）
 var SUPABASE_BUCKET   = 'media';                                           // Storage 的 bucket 名稱（需設為 Public）
 
 // 與 Postgres 資料表的對應；pk 是各表的主鍵欄位名稱
@@ -833,6 +833,22 @@ async function handleAuthState(user) {
       });
       return;
     }
+  }
+
+  // 🛡️ 擁有者特例：是擁有者信箱、卻仍讀不到管理員資料（bootstrap rpc 成功卻沒有建列、
+  //    或 owner 列被刪）。此時「絕不」把擁有者導到『請輸入邀請碼』畫面（那會讓他永遠進不去），
+  //    而是明確提示資料庫尚未初始化，並提供重試。
+  if (email === BOOTSTRAP_OWNER_EMAIL && (!meSnap || !meSnap.exists)) {
+    CU = null; clearAutoLogout(); clearAutoSave(); hidePendingScreen(); updateDOM();
+    Swal.fire({
+      title: '⚠ 擁有者帳號尚未初始化',
+      html: '偵測到您是擁有者（<b>' + email + '</b>），但資料庫裡還沒有對應的「超級執行長」資料。<br><br>' +
+            '請擇一處理後再按「重新整理」：<br>' +
+            '① 到 Supabase → <b>SQL Editor</b> 執行最新的 <b>supabase_schema.sql</b>（函式內的擁有者信箱需為 <b>markno.5.studio@gmail.com</b>）；<br>' +
+            '② 或執行「手動建立擁有者」SQL（見交付說明）直接補上超級執行長資料。',
+      icon: 'warning', confirmButtonText: '重新整理', showCancelButton: true, cancelButtonText: '稍後'
+    }).then(function(r){ if (r.isConfirmed) location.reload(); });
+    return;
   }
 
   if (meSnap && meSnap.exists) {
@@ -3416,19 +3432,40 @@ window.openBackendSettings = async function(scrollToCloud) {
         var ejs = bs.emailjs || {};
         h += '<h3 style="color:var(--gold);margin:20px 0 12px 0;font-size:1.1rem;border-bottom:2px solid var(--gold);padding-bottom:8px">▸ 🔐 帳號審核 / 通知設定</h3>';
         // 申請信箱
-        h += '<label style="display:block;margin-bottom:10px;font-size:.85rem">申請信箱（新帳號登入時，含邀請碼的通知信寄到這裡；留空＝預設 markno.5.studio@gmail.com）：<input id="bs-app-email" class="swal2-input" style="margin-top:4px" type="email" value="' + ((bs.appEmail||'').replace(/"/g,'&quot;')) + '" placeholder="markno.5.studio@gmail.com"></label>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">';
+        h += '<label for="bs-app-email" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">申請信箱：</label>';
+        h += '<input id="bs-app-email" class="swal2-input" style="margin:0;flex:1" type="email" value="' + ((bs.appEmail||'').replace(/"/g,'&quot;')) + '" placeholder="markno.5.studio@gmail.com">';
+        h += '</div>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">新帳號登入時，含邀請碼的通知信寄到這裡；留空＝預設 markno.5.studio@gmail.com。</small>';
         // 邀請碼
         var curCode = (D && D._inviteCode) || '';
-        h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">邀請碼（6 位，給對方輸入即可立即成為一般編輯）：<input id="bs-invite-code" class="swal2-input" style="margin-top:4px" maxlength="6" inputmode="numeric" value="' + curCode + '" placeholder="留空＝停用邀請碼"></label>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">';
+        h += '<label for="bs-invite-code" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">邀請碼：</label>';
+        h += '<input id="bs-invite-code" class="swal2-input" style="margin:0;flex:1" maxlength="6" inputmode="numeric" value="' + curCode + '" placeholder="6 位數字，留空＝停用">';
+        h += '</div>';
         h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">目前：' + (curCode ? ('<b style="color:#4ade80">已設定（' + curCode + '）</b>') : '未設定') + '。清空並儲存＝停用。</small>';
         // EmailJS
-        h += '<div style="font-size:.85rem;margin:6px 0 4px;color:var(--t2)"><b>EMAILJS 設定</b>（免費電郵通知服務，emailjs.com 申請）</div>';
-        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">SERVICE ID：<input id="bs-emailjs-service" class="swal2-input" style="margin-top:4px" value="' + ((ejs.serviceId||'').replace(/"/g,'&quot;')) + '" placeholder="service_xxx" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">TEMPLATE ID：<input id="bs-emailjs-template" class="swal2-input" style="margin-top:4px" value="' + ((ejs.templateId||'').replace(/"/g,'&quot;')) + '" placeholder="template_xxx" autocomplete="off"></label>';
-        h += '<label style="display:block;margin-bottom:8px;font-size:.85rem">PUBLIC KEY：<input id="bs-emailjs-public" class="swal2-input" style="margin-top:4px" value="' + ((ejs.publicKey||'').replace(/"/g,'&quot;')) + '" placeholder="xxxxxxxxxxxxx" autocomplete="off"></label>';
-        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px;line-height:1.7">模板變數：<b style="color:var(--gold)">{{to_email}}</b>、<b style="color:var(--gold)">{{user_name}}</b>、<b style="color:var(--gold)">{{user_email}}</b>、<b style="color:var(--gold)">{{site_name}}</b>、<b style="color:var(--gold)">{{site_url}}</b>、<b style="color:#4ade80">{{invite_code}}</b>（邀請碼，新帳號登入時自動寄到上方「申請信箱」）。<br>⚠ EmailJS 模板的「To Email」欄請填 <b>{{to_email}}</b>，信才會寄到指定信箱。</small>';
+        h += '<div style="font-size:.85rem;margin:6px 0 8px;color:var(--t2)"><b>EMAILJS 設定</b>（免費電郵通知服務，emailjs.com 申請）</div>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+        h += '<label for="bs-emailjs-service" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">SERVICE ID：</label>';
+        h += '<input id="bs-emailjs-service" class="swal2-input" style="margin:0;flex:1" value="' + ((ejs.serviceId||'').replace(/"/g,'&quot;')) + '" placeholder="service_xxx" autocomplete="off">';
+        h += '</div>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+        h += '<label for="bs-emailjs-template" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">TEMPLATE ID：</label>';
+        h += '<input id="bs-emailjs-template" class="swal2-input" style="margin:0;flex:1" value="' + ((ejs.templateId||'').replace(/"/g,'&quot;')) + '" placeholder="template_xxx" autocomplete="off">';
+        h += '</div>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+        h += '<label for="bs-emailjs-public" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">PUBLIC KEY：</label>';
+        h += '<input id="bs-emailjs-public" class="swal2-input" style="margin:0;flex:1" value="' + ((ejs.publicKey||'').replace(/"/g,'&quot;')) + '" placeholder="xxxxxxxxxxxxx" autocomplete="off">';
+        h += '</div>';
+        h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:4px;line-height:1.7">模板變數：<b style="color:var(--gold)">{{to_email}}</b>、<b style="color:var(--gold)">{{user_name}}</b>、<b style="color:var(--gold)">{{user_email}}</b>、<b style="color:var(--gold)">{{site_name}}</b>、<b style="color:var(--gold)">{{site_url}}</b>、<b style="color:#4ade80">{{invite_code}}</b></small>';
+        h += '<div style="background:rgba(201,150,58,.1);border:1px solid rgba(201,150,58,.4);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.78rem;color:var(--gold);line-height:1.7">⚠ <b>重要：</b>EmailJS 模板的「<b>To Email</b>」欄必須填 <b>{{to_email}}</b>，信才會寄到上方「申請信箱」。若只有 200 OK 但收不到信，請到 <a href="https://dashboard.emailjs.com/admin/templates" target="_blank" style="color:var(--gold-lt)">EmailJS 模板設定</a> 確認此欄位。</div>';
+        h += '<button id="bs-test-email-btn" type="button" style="margin-bottom:12px;padding:6px 16px;background:var(--bg3);border:1px solid var(--border-g);color:var(--gold);cursor:pointer;font-size:.8rem;border-radius:4px">📧 發送測試信</button>';
         // 緊急密碼
-        h += '<label style="display:block;margin-bottom:4px;font-size:.85rem">管理員緊急設定密碼：<input id="bs-emergency-pw" class="swal2-input" style="margin-top:4px" type="password" placeholder="設定新密碼（留空＝不變）" autocomplete="new-password"></label>';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">';
+        h += '<label for="bs-emergency-pw" style="font-size:.85rem;white-space:nowrap;flex-shrink:0;min-width:80px">緊急密碼：</label>';
+        h += '<input id="bs-emergency-pw" class="swal2-input" style="margin:0;flex:1" type="password" placeholder="設定新密碼（留空＝不變）" autocomplete="new-password">';
+        h += '</div>';
         h += '<small style="color:var(--t3);font-size:.72rem;display:block;margin-bottom:12px">目前：' + (bs.emergencyHash ? '<b style="color:#4ade80">已設定</b>' : '未設定') + '。用於登入畫面「緊急設定入口」（只開後台設定用）。</small>';
       }
 
@@ -3466,6 +3503,44 @@ window.openBackendSettings = async function(scrollToCloud) {
         neverLogoutCb.addEventListener('change', function() {
           logoutInput.disabled     = this.checked;
           logoutInput.style.opacity = this.checked ? '0.35' : '1';
+        });
+      }
+      // 📧 測試寄信按鈕
+      var testEmailBtn = document.getElementById('bs-test-email-btn');
+      if (testEmailBtn) {
+        testEmailBtn.addEventListener('click', function() {
+          var svcEl  = document.getElementById('bs-emailjs-service');
+          var tplEl  = document.getElementById('bs-emailjs-template');
+          var pubEl  = document.getElementById('bs-emailjs-public');
+          var toEl   = document.getElementById('bs-app-email');
+          var svcId  = svcEl  ? svcEl.value.trim()  : '';
+          var tplId  = tplEl  ? tplEl.value.trim()  : '';
+          var pubKey = pubEl  ? pubEl.value.trim()  : '';
+          var toAddr = (toEl && toEl.value.trim()) || 'markno.5.studio@gmail.com';
+          if (!svcId || !tplId || !pubKey) {
+            Swal.fire({ title:'⚠ 請先填入 EmailJS 設定', text:'SERVICE ID、TEMPLATE ID、PUBLIC KEY 均需填寫。', icon:'warning' });
+            return;
+          }
+          testEmailBtn.disabled = true;
+          testEmailBtn.textContent = '寄送中…';
+          emailjs.send(svcId, tplId, {
+            to_email:    toAddr,
+            user_name:   '測試帳號',
+            user_email:  toAddr,
+            site_name:   (D && D.brandName) || 'MARK NO.5',
+            site_url:    location.origin,
+            invite_code: '（測試）'
+          }, { publicKey: pubKey })
+          .then(function() {
+            testEmailBtn.disabled = false;
+            testEmailBtn.textContent = '📧 發送測試信';
+            Swal.fire({ title:'✅ 測試信已送出', html:'請到 <b>' + toAddr + '</b> 確認是否收到。<br><small style="color:var(--t3)">若 EmailJS 回傳 200 但仍收不到，請到 EmailJS 模板設定確認「To Email」欄填的是 <b>{{to_email}}</b>。</small>', icon:'success' });
+          })
+          .catch(function(err) {
+            testEmailBtn.disabled = false;
+            testEmailBtn.textContent = '📧 發送測試信';
+            Swal.fire({ title:'寄送失敗', text:(err && (err.text || err.message)) || String(err), icon:'error' });
+          });
         });
       }
     },
@@ -4116,7 +4191,7 @@ window.showUsers = function() {
       var p = (u.uid) ? db.collection('admins').doc(u.uid).delete() : Promise.resolve();
       p.then(function() {
         D.users.splice(i, 1);
-        document.getElementById('ulistw').innerHTML = uLH();
+        showUsers();
       }).catch(function(e) { Swal.fire({title:'移除失敗',text:(e.message||e),icon:'error'}); });
     });
   };
