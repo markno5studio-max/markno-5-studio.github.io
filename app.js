@@ -25,7 +25,7 @@ var KEY = 'MK5_DATA'; // 固定 key（僅用於相容/快取，主要資料存�
      4. Storage → New bucket「media」，打開 Public。
      5. Project Settings → API，把 Project URL 與 Publishable key 填到下方。
 ============================================================ */
-var SUPABASE_URL      = 'https://pnuhqvciedctovibrqmu.supabase.co';        // Project URL
+var SUPABASE_URL      = 'https://ipvyroculwdsemxwxlna.supabase.co';        // Project URL
 var SUPABASE_ANON_KEY = 'sb_publishable_6o2RDhsp3pH1roEqMAZqeQ_v1shcB1t';  // Publishable key（可公開）
 var SUPABASE_BUCKET   = 'media';                                           // Storage 的 bucket 名稱（需設為 Public）
 
