@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.09.06';
+const SITE_VERSION = '2026.06.09.07';
 
 /* ============================================================
    STORAGE KEY
@@ -4301,8 +4301,10 @@ window.showUsers = function() {
               return saveAdmin(D.users[userIdx]); // 寫入該管理員 doc
             })
             .then(function() {
-              document.getElementById('ulistw').innerHTML = uLH();
-              Swal.fire({title:'✅ 大頭貼已上傳！',timer:1200,showConfirmButton:false,icon:'success'});
+              // 此時「帳號管理」清單已被「上傳中…」對話框取代（#ulistw 已不存在），
+              // 直接重新開啟 showUsers() 呈現更新後的頭像，避免存取 null。
+              Swal.fire({title:'✅ 大頭貼已上傳！',timer:1200,showConfirmButton:false,icon:'success'})
+                .then(function(){ showUsers(); });
             })
             .catch(function(err) { Swal.fire({title:'上傳失敗',text:(err.message||err),icon:'error'}); });
         };
