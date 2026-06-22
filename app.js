@@ -2,7 +2,7 @@
    SITE VERSION
 ============================================================ */
 
-const SITE_VERSION = '2026.06.09.07';
+const SITE_VERSION = '2026.06.09.08';
 
 /* ============================================================
    STORAGE KEY
@@ -2960,8 +2960,51 @@ function updateAdminUI() {
   }
 }
 
+// 偵測是否在 App 內建瀏覽器（WebView）中。Google 基於安全政策禁止在這類環境做 OAuth 登入
+// （會回 403 disallowed_useragent），常見於從 LINE / FB / IG / Messenger / 微信 的連結點進來。
+function isInAppBrowser() {
+  var ua = (navigator.userAgent || navigator.vendor || '').toLowerCase();
+  return ua.indexOf('line/') !== -1 ||          // LINE
+         ua.indexOf('fban') !== -1 || ua.indexOf('fbav') !== -1 || ua.indexOf('fb_iab') !== -1 || // Facebook
+         ua.indexOf('instagram') !== -1 ||      // Instagram
+         ua.indexOf('messenger') !== -1 ||      // Messenger
+         ua.indexOf('micromessenger') !== -1 || // 微信 WeChat
+         ua.indexOf('weibo') !== -1;            // 微博
+}
+
+// App 內建瀏覽器時，引導使用者改用系統瀏覽器（Safari / Chrome）開啟
+function showOpenInBrowserHint() {
+  var url = location.href;
+  Swal.fire({
+    title: '請改用瀏覽器開啟',
+    icon: 'info',
+    html: '<div style="text-align:left;line-height:1.95;font-size:.92rem">' +
+          '偵測到你目前是從 <b>App 內建瀏覽器</b>（例如 LINE／FB／IG）開啟本站。<br>' +
+          'Google 基於安全政策，<b>不允許在這裡登入後台</b>。<br><br>' +
+          '請改用 <b>Safari</b> 或 <b>Chrome</b> 開啟本站再登入：<br>' +
+          '① 點畫面角落的「<b>⋯</b>」選單<br>' +
+          '② 選「<b>用預設瀏覽器開啟</b>／在 Safari 開啟」<br>' +
+          '③ 在瀏覽器中再按「後台登入」即可' +
+          '</div>',
+    showCancelButton: true,
+    confirmButtonText: '複製網址',
+    cancelButtonText: '關閉'
+  }).then(function(r) {
+    if (!r.isConfirmed) return;
+    var done = function(){ Swal.fire({ title:'✅ 已複製網址', text:'貼到 Safari／Chrome 開啟即可登入', timer:2000, showConfirmButton:false, icon:'success' }); };
+    var manual = function(){ Swal.fire({ title:'請手動複製這個網址', html:'<div style="word-break:break-all;font-size:.85rem;color:var(--gold)">' + url + '</div>', icon:'info' }); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(manual);
+      } else { manual(); }
+    } catch(e) { manual(); }
+  });
+}
+
 window.showLoginModal = function() {
   if (!auth || !sb) { Swal.fire({ title:'Supabase Auth 尚未初始化', text:'請確認 app.js 已填入 Supabase 金鑰。', icon:'error' }); return; }
+  // App 內建瀏覽器（LINE/FB/IG…）無法用 Google 登入 → 改顯示「請用瀏覽器開啟」引導
+  if (isInAppBrowser()) { showOpenInBrowserHint(); return; }
   Swal.fire({
     title: '後台登入',
     html: '<p style="color:var(--t2);font-size:.9rem;line-height:1.8;margin-bottom:6px">請使用 Google 帳號登入。<br>新帳號需輸入管理者提供的邀請碼。</p>',
